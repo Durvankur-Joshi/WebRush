@@ -120,7 +120,7 @@ export const StoryCompletion: React.FC<StoryCompletionProps> = ({
             <span className="font-mono text-xs font-bold text-content-main uppercase">Domestic Ledger</span>
           </div>
           <p className="text-xs text-content-muted leading-relaxed">
-            Everyday sustenance tracking with Food dominating 36.9% of all entries, contrasting lump-sum capital movements.
+            Everyday sustenance tracking with food dominating recorded transaction frequency, contrasting lump-sum capital movements.
           </p>
         </div>
 

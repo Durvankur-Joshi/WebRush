@@ -17,6 +17,14 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
   const foodCat = household.categoryFrequency[0];
   const travelCat = transactions.categoryAmounts.find((c) => c.category.toLowerCase().includes('travel'));
 
+  const spotStartYear = spotify.dateRange.start ? new Date(spotify.dateRange.start).getFullYear() : 0;
+  const spotEndYear = spotify.dateRange.end ? new Date(spotify.dateRange.end).getFullYear() : 0;
+  const spotYears = spotStartYear && spotEndYear && spotEndYear >= spotStartYear ? spotEndYear - spotStartYear + 1 : 0;
+
+  const houseStartYear = household.dateRange.start ? new Date(household.dateRange.start).getFullYear() : 0;
+  const houseEndYear = household.dateRange.end ? new Date(household.dateRange.end).getFullYear() : 0;
+  const houseYears = houseStartYear && houseEndYear && houseEndYear >= houseStartYear ? houseEndYear - houseStartYear + 1 : 0;
+
   return (
     <div className="space-y-12 pt-4">
       {/* Three Streams Detailed Cards */}
@@ -33,9 +41,8 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
           <div className="rounded-lg border border-border/70 bg-surface/50 p-6 space-y-5 flex flex-col justify-between hover:border-accent-primary/50 transition-all group">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-2 rounded bg-surface border border-border flex items-center gap-2">
-                  <Headphones className="w-5 h-5 text-accent-primary" />
-                  <span className="font-mono text-xs font-bold text-accent-primary">STREAM 01</span>
+                <div className="w-10 h-10 rounded-md bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary group-hover:scale-105 transition-transform">
+                  <Headphones className="w-5 h-5" />
                 </div>
                 <Badge variant="primary" size="sm" className="font-mono">
                   {spotify.dateRange.start.slice(0, 4)} — {spotify.dateRange.end.slice(0, 4)}
@@ -47,7 +54,7 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
                   Music Streaming
                 </h3>
                 <p className="text-xs text-content-muted font-mono">
-                  Listening History (11 Years)
+                  Listening History ({spotYears > 0 ? `${spotYears} Years` : 'Multi-Year'})
                 </p>
               </div>
 
@@ -66,12 +73,12 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-content-dim">Top Loyalty Artist:</span>
-                  <span className="text-content-main truncate max-w-[140px]">{topArtist?.artist || 'The Beatles'}</span>
+                  <span className="text-content-main truncate max-w-[140px]">{topArtist?.artist || 'N/A'}</span>
                 </div>
               </div>
 
               <p className="text-xs text-content-muted leading-relaxed">
-                Spans 11 continuous years of auditory consumption. Reflects nocturnal concentration, habit shifts in skip behavior, and deep artist exploration.
+                Spans {spotYears > 0 ? `${spotYears} continuous years` : 'longitudinal periods'} of auditory consumption. Reflects nocturnal concentration, habit shifts in skip behavior, and deep artist exploration.
               </p>
             </div>
 
@@ -80,7 +87,8 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
               size="sm"
               onClick={() => onNavigate?.('explore', { stream: 'spotify' })}
               icon={<ArrowRight className="w-4 h-4" />}
-              className="w-full justify-between mt-2 font-mono text-xs"
+              iconPosition="right"
+              className="w-full justify-between"
             >
               Explore Audio Receipts
             </Button>
@@ -90,9 +98,8 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
           <div className="rounded-lg border border-border/70 bg-surface/50 p-6 space-y-5 flex flex-col justify-between hover:border-accent-emerald/50 transition-all group">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-2 rounded bg-surface border border-border flex items-center gap-2">
-                  <Wallet className="w-5 h-5 text-accent-emerald" />
-                  <span className="font-mono text-xs font-bold text-accent-emerald">STREAM 02</span>
+                <div className="w-10 h-10 rounded-md bg-accent-emerald/10 border border-accent-emerald/20 flex items-center justify-center text-accent-emerald group-hover:scale-105 transition-transform">
+                  <Wallet className="w-5 h-5" />
                 </div>
                 <Badge variant="success" size="sm" className="font-mono">
                   {household.dateRange.start.slice(0, 4)} — {household.dateRange.end.slice(0, 4)}
@@ -104,7 +111,7 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
                   Domestic Ledger
                 </h3>
                 <p className="text-xs text-content-muted font-mono">
-                  Everyday Financial Activity (4 Years)
+                  Everyday Financial Activity ({houseYears > 0 ? `${houseYears} Years` : 'Multi-Year'})
                 </p>
               </div>
 
@@ -115,7 +122,7 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-content-dim">Top Category:</span>
-                  <span className="text-content-main">{foodCat?.category || 'Food'} ({foodCat?.count || 907} txns)</span>
+                  <span className="text-content-main">{foodCat ? `${foodCat.category} (${foodCat.count.toLocaleString()} txns)` : 'N/A'}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-content-dim">Data Completeness:</span>
@@ -124,7 +131,7 @@ export const DataStreams: React.FC<DataStreamsProps> = ({ analytics, onNavigate 
               </div>
 
               <p className="text-xs text-content-muted leading-relaxed">
-                Granular domestic cashflow entries manually recorded across four years. Dominance of subsistence tracking contrasted with lump-sum transfers.
+                Granular domestic cashflow entries manually recorded across {houseYears > 0 ? `${houseYears} calendar years` : 'recorded periods'}. Dominance of subsistence tracking contrasted with lump-sum transfers.
               </p>
             </div>
 

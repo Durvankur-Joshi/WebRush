@@ -39,7 +39,7 @@ export const StoryHero: React.FC<StoryHeroProps> = ({ metrics, onBeginStory }) =
         </p>
 
         <p className="text-xs sm:text-sm text-content-muted leading-relaxed max-w-2xl">
-          Across 12 years of music streaming, everyday grocery ledgers, and digital card commerce,
+          Across {metrics.totalYears > 0 ? `${metrics.totalYears} years` : 'longitudinal epochs'} of music streaming, everyday grocery ledgers, and digital card commerce,
           your data preserves more than raw receipts. Follow the interactive chapter narrative to see how
           unconscious daily choices coalesced into lasting patterns.
         </p>

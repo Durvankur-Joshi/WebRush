@@ -12,7 +12,7 @@ export const ConstellationView: React.FC = () => {
       <SectionHeader
         tag="DATA OBSERVATORY // CONSTELLATION"
         title="Temporal Comparative Constellation"
-        description="A multi-dimensional celestial map plotting 11 years of receipts as interconnected nodes across acoustic, domestic, and digital commerce dimensions."
+        description="A multi-dimensional celestial map plotting longitudinal receipts as interconnected nodes across acoustic, domestic, and digital commerce dimensions."
         level="h1"
         action={
           <Badge variant="primary" size="md" icon={<Sparkles className="w-3.5 h-3.5" />}>

@@ -81,15 +81,15 @@ export function generateStoryChapters(
       period: '2015–2016',
       narrative:
         `Digital interaction patterns rarely remain static. Between 2015 and 2016, a pronounced behavioral shift occurred in playback telemetry: ` +
-        `track skip rate fell from ${yr2015?.skipRate.toFixed(1) ?? '78'}% down to ${yr2016?.skipRate.toFixed(1) ?? '3.6'}%. ` +
+        `track skip rate fell from ${yr2015 ? `${yr2015.skipRate.toFixed(1)}%` : 'its initial baseline'} down to ${yr2016 ? `${yr2016.skipRate.toFixed(1)}%` : 'its collapsed level'}. ` +
         `This structural drop marks an evolution from high-turnover playlist browsing toward sustained, immersive track completion.`,
       discoveries: [skipDisc],
       evidence: skipDisc.evidence,
       primaryDataset: 'spotify',
       keyMetrics: [
-        { label: '2015 Skip Rate', value: `${yr2015?.skipRate.toFixed(1)}%` },
-        { label: '2016 Skip Rate', value: `${yr2016?.skipRate.toFixed(1)}%` },
-        { label: 'Shift Delta', value: `-${Math.abs((yr2015?.skipRate ?? 0) - (yr2016?.skipRate ?? 0)).toFixed(1)} pp` },
+        { label: '2015 Skip Rate', value: yr2015 ? `${yr2015.skipRate.toFixed(1)}%` : 'N/A' },
+        { label: '2016 Skip Rate', value: yr2016 ? `${yr2016.skipRate.toFixed(1)}%` : 'N/A' },
+        { label: 'Shift Delta', value: yr2015 && yr2016 ? `-${Math.abs(yr2015.skipRate - yr2016.skipRate).toFixed(1)} pp` : 'N/A' },
       ],
     });
   }
@@ -110,8 +110,8 @@ export function generateStoryChapters(
       period: '2015–2018',
       narrative:
         `During the 2015–2018 era, domestic expenditure receipts provide a granular window into daily living rhythms. ` +
-        `Ledger entries reveal deliberate tracking routines dominated by daily necessities: ${foodCat?.category || 'Food'} accounted for ${foodCat?.percentage.toFixed(1) || '30'}% of all recorded transaction events, ` +
-        `while capital allocation concentrated in recurring obligations such as ${topExpCat?.category || 'major expenses'} (INR ${topExpCat?.amount.toLocaleString() || '0'}).`,
+        `Ledger entries reveal deliberate tracking routines dominated by daily necessities: ${foodCat ? `${foodCat.category} accounted for ${foodCat.percentage.toFixed(1)}% of all recorded transaction events` : 'daily necessities accounted for the majority of logged events'}, ` +
+        `while capital allocation concentrated in recurring obligations such as ${topExpCat ? `${topExpCat.category} (INR ${topExpCat.amount.toLocaleString()})` : 'lump-sum obligations'}.`,
       discoveries: householdDisc.slice(0, 3),
       evidence: [
         ...(householdDisc[0]?.evidence ?? []),

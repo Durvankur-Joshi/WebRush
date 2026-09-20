@@ -14,121 +14,133 @@ function getMiniChartForDiscovery(d: Discovery, analytics: LifeAnalytics): MiniC
 
   // 1. Skip Shift Collapse
   if (d.id === 'disc-spotify-skip-shift') {
-    const yr2014 = spotify.yearlySkipRates.find((y) => y.year === 2014)?.skipRate || 67.2;
-    const yr2015 = spotify.yearlySkipRates.find((y) => y.year === 2015)?.skipRate || 78.8;
-    const yr2016 = spotify.yearlySkipRates.find((y) => y.year === 2016)?.skipRate || 3.6;
-    const yr2017 = spotify.yearlySkipRates.find((y) => y.year === 2017)?.skipRate || 0.2;
-    return {
-      type: 'bar',
-      points: [
-        { label: '2014', value: yr2014 },
-        { label: '2015', value: yr2015, highlight: true, annotation: '78.8%' },
-        { label: '2016', value: yr2016, highlight: true, annotation: '3.6%' },
-        { label: '2017', value: yr2017 },
-      ],
-      unit: '%',
-      deltaText: '-75.2% collapse in skip rate',
-      deltaPositive: true,
-    };
+    const yr2014 = spotify.yearlySkipRates?.find((y) => y.year === 2014);
+    const yr2015 = spotify.yearlySkipRates?.find((y) => y.year === 2015);
+    const yr2016 = spotify.yearlySkipRates?.find((y) => y.year === 2016);
+    const yr2017 = spotify.yearlySkipRates?.find((y) => y.year === 2017);
+
+    if (yr2015 && yr2016) {
+      const delta = yr2015.skipRate - yr2016.skipRate;
+      return {
+        type: 'bar',
+        points: [
+          ...(yr2014 ? [{ label: '2014', value: yr2014.skipRate }] : []),
+          { label: '2015', value: yr2015.skipRate, highlight: true, annotation: `${yr2015.skipRate.toFixed(1)}%` },
+          { label: '2016', value: yr2016.skipRate, highlight: true, annotation: `${yr2016.skipRate.toFixed(1)}%` },
+          ...(yr2017 ? [{ label: '2017', value: yr2017.skipRate }] : []),
+        ],
+        unit: '%',
+        deltaText: `-${Math.abs(delta).toFixed(1)}% collapse in skip rate`,
+        deltaPositive: true,
+      };
+    }
   }
 
   // 2. Nocturnal Listening Concentration
   if (d.id === 'disc-spotify-hour-concentration') {
-    return {
-      type: 'bar',
-      points: [
-        { label: 'Morning', value: 15.2 },
-        { label: 'Afternoon', value: 26.2 },
-        { label: 'Evening', value: 39.8, highlight: true },
-        { label: 'Late Night', value: 18.8, highlight: true },
-      ],
-      unit: '%',
-      deltaText: '58.6% Nocturnal concentration',
-    };
+    const morning = spotify.hourlyListening.filter((h) => h.hour >= 6 && h.hour < 12).reduce((s, h) => s + h.count, 0);
+    const afternoon = spotify.hourlyListening.filter((h) => h.hour >= 12 && h.hour < 18).reduce((s, h) => s + h.count, 0);
+    const evening = spotify.hourlyListening.filter((h) => h.hour >= 18 && h.hour <= 23).reduce((s, h) => s + h.count, 0);
+    const night = spotify.hourlyListening.filter((h) => h.hour >= 0 && h.hour < 6).reduce((s, h) => s + h.count, 0);
+    const total = morning + afternoon + evening + night;
+
+    if (total > 0) {
+      const nocturnalPct = Number((((evening + night) / total) * 100).toFixed(1));
+      return {
+        type: 'bar',
+        points: [
+          { label: 'Morning', value: Number(((morning / total) * 100).toFixed(1)) },
+          { label: 'Afternoon', value: Number(((afternoon / total) * 100).toFixed(1)) },
+          { label: 'Evening', value: Number(((evening / total) * 100).toFixed(1)), highlight: true },
+          { label: 'Late Night', value: Number(((night / total) * 100).toFixed(1)), highlight: true },
+        ],
+        unit: '%',
+        deltaText: `${nocturnalPct}% Nocturnal concentration`,
+      };
+    }
   }
 
-  // 3. Acoustic Zenith: Peak Listening 2020
-  if (d.id === 'disc-spotify-peak-eras') {
-    const y2018 = spotify.yearlyListening.find((a) => a.year === 2018)?.hours || 620;
-    const y2019 = spotify.yearlyListening.find((a) => a.year === 2019)?.hours || 890;
-    const y2020 = spotify.yearlyListening.find((a) => a.year === 2020)?.hours || 1234.6;
-    const y2021 = spotify.yearlyListening.find((a) => a.year === 2021)?.hours || 940;
+  // 3. Acoustic Zenith: Peak Listening
+  if (d.id === 'disc-spotify-peak-eras' && spotify.yearlyListening.length > 0) {
+    const peak = spotify.yearlyListening.reduce((max, y) => (y.hours > max.hours ? y : max), spotify.yearlyListening[0]);
+    const sorted = [...spotify.yearlyListening].sort((a, b) => a.year - b.year);
+    const recentYears = sorted.slice(-4);
     return {
       type: 'bar',
-      points: [
-        { label: '2018', value: Math.round(y2018) },
-        { label: '2019', value: Math.round(y2019) },
-        { label: '2020', value: Math.round(y2020), highlight: true, annotation: 'Peak' },
-        { label: '2021', value: Math.round(y2021) },
-      ],
+      points: recentYears.map((y) => ({
+        label: String(y.year),
+        value: Math.round(y.hours),
+        highlight: y.year === peak.year,
+        annotation: y.year === peak.year ? 'Peak' : undefined,
+      })),
       unit: 'hrs',
-      deltaText: 'All-time acoustic zenith in 2020',
+      deltaText: `All-time acoustic zenith in ${peak.year} (${Math.round(peak.hours).toLocaleString()} hrs)`,
     };
   }
 
-  // 4. The Beatles Loyalty Anchor
-  if (d.id === 'disc-spotify-persistent-artist') {
-    const top1 = spotify.topArtists[0] || { artist: 'The Beatles', playCount: 13621 };
-    const top2 = spotify.topArtists[1] || { artist: 'Artist 2', playCount: 3420 };
-    const top3 = spotify.topArtists[2] || { artist: 'Artist 3', playCount: 2150 };
+  // 4. The Beatles / Persistent Artist Loyalty Anchor
+  if (d.id === 'disc-spotify-persistent-artist' && spotify.topArtists.length > 0) {
+    const top1 = spotify.topArtists[0];
+    const top2 = spotify.topArtists[1];
+    const top3 = spotify.topArtists[2];
+    const leadRatio = top2 && top2.playCount > 0 ? (top1.playCount / top2.playCount).toFixed(1) : '1.0';
     return {
       type: 'comparison',
       points: [
-        { label: 'The Beatles', value: top1.playCount, highlight: true },
-        { label: top2.artist.slice(0, 10), value: top2.playCount },
-        { label: top3.artist.slice(0, 10), value: top3.playCount },
+        { label: top1.artist.slice(0, 14), value: top1.playCount, highlight: true },
+        ...(top2 ? [{ label: top2.artist.slice(0, 14), value: top2.playCount }] : []),
+        ...(top3 ? [{ label: top3.artist.slice(0, 14), value: top3.playCount }] : []),
       ],
       unit: 'plays',
-      deltaText: '4.0x lead over runner-up',
+      deltaText: `${leadRatio}x lead over runner-up`,
     };
   }
 
   // 5. Food Dominance in Household Ledger
-  if (d.id === 'disc-household-food-dominance') {
-    const food = household.categoryFrequency[0] || { category: 'Food', percentage: 36.9 };
-    const c2 = household.categoryFrequency[1] || { category: 'Transport', percentage: 12.5 };
-    const c3 = household.categoryFrequency[2] || { category: 'Household', percentage: 11.2 };
+  if (d.id === 'disc-household-food-dominance' && household.categoryFrequency.length > 0) {
+    const top = household.categoryFrequency.slice(0, 3);
+    const otherPct = Math.max(0, 100 - top.reduce((s, c) => s + c.percentage, 0));
+    const food = top[0];
     return {
       type: 'distribution',
       points: [
-        { label: 'Food', value: Number(food.percentage.toFixed(1)), highlight: true },
-        { label: c2.category, value: Number(c2.percentage.toFixed(1)) },
-        { label: c3.category, value: Number(c3.percentage.toFixed(1)) },
-        { label: 'Others', value: Number((100 - food.percentage - c2.percentage - c3.percentage).toFixed(1)) },
+        { label: food.category, value: Number(food.percentage.toFixed(1)), highlight: true },
+        ...top.slice(1).map((c) => ({ label: c.category, value: Number(c.percentage.toFixed(1)) })),
+        ...(otherPct > 0 ? [{ label: 'Others', value: Number(otherPct.toFixed(1)) }] : []),
       ],
       unit: '%',
-      deltaText: 'Food = 907 of 2,461 entries (36.9%)',
+      deltaText: `${food.category} = ${food.count.toLocaleString()} of ${household.totalRecords.toLocaleString()} entries (${food.percentage.toFixed(1)}%)`,
     };
   }
 
   // 6. Household Frequency vs Impact Divergence
-  if (d.id === 'disc-household-freq-vs-impact') {
+  if (d.id === 'disc-household-freq-vs-impact' && household.categoryAmounts.length > 0) {
+    const topAmounts = household.categoryAmounts.slice(0, 3);
     return {
       type: 'comparison',
-      points: [
-        { label: 'Money Transfer', value: 606529, highlight: true },
-        { label: 'Food Outflow', value: 215400 },
-        { label: 'Other Total', value: 1135462 },
-      ],
+      points: topAmounts.map((c, i) => ({
+        label: c.category.slice(0, 14),
+        value: Math.round(c.amount),
+        highlight: i === 0,
+      })),
       unit: '₹',
-      deltaText: 'Lump-sum transfers vs micro-food',
+      deltaText: 'Lump-sum capital commitments vs recurring micro-expenses',
     };
   }
 
   // 7. Travel Highest Mean Ticket Size
-  if (d.id === 'disc-txn-category-ticket-size') {
-    const travel = transactions.categoryAmounts.find((c) => c.category.toLowerCase().includes('travel'))?.avgAmount || 5556;
-    const shopping = transactions.categoryAmounts.find((c) => c.category.toLowerCase().includes('shopping'))?.avgAmount || 5009;
-    const entertain = transactions.categoryAmounts.find((c) => c.category.toLowerCase().includes('entertain'))?.avgAmount || 5145;
+  if (d.id === 'disc-txn-category-ticket-size' && transactions.categoryAmounts.length > 0) {
+    const sorted = [...transactions.categoryAmounts].sort((a, b) => (b.avgAmount || 0) - (a.avgAmount || 0)).slice(0, 3);
+    const leader = sorted[0];
     return {
       type: 'bar',
-      points: [
-        { label: 'Travel', value: Math.round(travel), highlight: true },
-        { label: 'Shopping', value: Math.round(shopping) },
-        { label: 'Entertainment', value: Math.round(entertain) },
-      ],
+      points: sorted.map((c, i) => ({
+        label: c.category.slice(0, 14),
+        value: Math.round(c.avgAmount || 0),
+        highlight: i === 0,
+      })),
       unit: '₹',
-      deltaText: 'Highest average card ticket (₹5,556)',
+      deltaText: leader ? `Highest average card ticket (INR ${Math.round(leader.avgAmount || 0).toLocaleString()})` : undefined,
     };
   }
 

@@ -79,7 +79,7 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       keyMetricLabel: 'Listening Duration',
       keyMetricValue: `${spotify.totalListeningHours.toFixed(0)} hours`,
       accentColor: '#38BDF8',
-      description: `Spanning ${spotify.uniqueArtists.toLocaleString()} artists. Anchored by ${topArtist?.artist || 'The Beatles'} (${topArtist?.playCount.toLocaleString() || '13.6K'} plays).`,
+      description: `Spanning ${spotify.uniqueArtists.toLocaleString()} artists.${topArtist ? ` Anchored by ${topArtist.artist} (${topArtist.playCount.toLocaleString()} plays).` : ''}`,
       badge: 'Auditory Habits',
     },
     {
@@ -92,7 +92,7 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       keyMetricLabel: 'Logged Outflow',
       keyMetricValue: `INR ${(household.totalExpenses / 100000).toFixed(2)}L`,
       accentColor: '#10B981',
-      description: `Domestic ledger tracking routines. ${foodCat?.category || 'Food'} accounts for ${foodCat?.percentage.toFixed(1) || '36.9'}% of all recorded events.`,
+      description: `Domestic ledger tracking routines.${foodCat ? ` ${foodCat.category} accounts for ${foodCat.percentage.toFixed(1)}% of all recorded events.` : ''}`,
       badge: 'Domestic Ledger',
     },
     {
@@ -105,7 +105,7 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       keyMetricLabel: 'Commercial Outflow',
       keyMetricValue: `INR ${(transactions.totalAmount / 10000000).toFixed(2)} Cr`,
       accentColor: '#F59E0B',
-      description: `Modern digital commerce spanning online shopping, entertainment, medical, and travel (avg INR ${travelCat?.avgAmount?.toFixed(0) || '5,556'}).`,
+      description: `Modern digital commerce spanning online shopping, entertainment, medical, and travel${travelCat?.avgAmount ? ` (avg INR ${Math.round(travelCat.avgAmount).toLocaleString()})` : ''}.`,
       badge: 'PII SANITIZED · SAFE VIEW',
     },
   ];
@@ -125,20 +125,16 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
 
     // Associated pattern/highlight for that year (factual, derived from analytics)
     let notablePattern: string | undefined;
-    if (yr === 2015) {
-      const skipRate = sYear?.skipRate ?? 78.8;
-      notablePattern = `Track skip rate observed at ${skipRate.toFixed(1)}% prior to structural transition`;
-    } else if (yr === 2016) {
-      const skipRate = sYear?.skipRate ?? 3.6;
-      notablePattern = `Skip rate decreased to ${skipRate.toFixed(1)}%; sustained playback engagement emerged`;
-    } else if (yr === 2017) {
-      const plays = sYear ? sYear.playCount.toLocaleString() : '20,000+';
-      notablePattern = `Concurrent activity: ${plays} audio plays recorded alongside domestic ledger entries`;
+    if (yr === 2015 && sYear?.skipRate != null) {
+      notablePattern = `Track skip rate observed at ${sYear.skipRate.toFixed(1)}% prior to structural transition`;
+    } else if (yr === 2016 && sYear?.skipRate != null) {
+      notablePattern = `Skip rate decreased to ${sYear.skipRate.toFixed(1)}%; sustained playback engagement emerged`;
+    } else if (yr === 2017 && sYear) {
+      notablePattern = `Concurrent activity: ${sYear.playCount.toLocaleString()} audio plays recorded alongside domestic ledger entries`;
     } else if (yr === 2018) {
       notablePattern = 'Domestic ledger recording concluded';
-    } else if (yr === 2020) {
-      const hrs = sYear ? Math.round(sYear.hours).toLocaleString() : '1,235';
-      notablePattern = `Annual listening peak: ${hrs} hours recorded`;
+    } else if (yr === 2020 && sYear) {
+      notablePattern = `Annual listening peak: ${Math.round(sYear.hours).toLocaleString()} hours recorded`;
     } else if (yr === 2022) {
       notablePattern = 'Card commerce telemetry begins across digital retail facets';
     } else if (yr === 2023) {

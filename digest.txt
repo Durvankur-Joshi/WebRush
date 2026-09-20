@@ -19015,6 +19015,7 @@ export function buildConstellationGraph(analytics: LifeAnalytics): {
   const topArtist = spotify.topArtists[0] || { artist: 'The Beatles', playCount: 13621, hours: 336.2 };
   const yr2015 = spotify.yearlySkipRates.find((y) => y.year === 2015) || { skipRate: 78.8 };
   const yr2016 = spotify.yearlySkipRates.find((y) => y.year === 2016) || { skipRate: 3.6 };
+  const yr2020 = spotify.yearlyListening.find((y) => y.year === 2020) || { hours: 1234.6 };
   const foodCat = household.categoryFrequency.find((c) => c.category.toLowerCase().includes('food')) || {
     category: 'Food',
     count: 907,
@@ -19208,12 +19209,12 @@ export function buildConstellationGraph(analytics: LifeAnalytics): {
       whatItRepresents:
         'The calendar year with highest cumulative playback hours across the entire history.',
       whyItMatters:
-        'Signifies an era of intense music consumption, coinciding with global stay-at-home routines.',
+        'Recorded the highest annual cumulative playback hours across the 11-year observation window.',
       source: 'spotify',
       metricLabel: 'Peak Hours',
-      metricValue: '1,235 hrs',
+      metricValue: `${Math.round(yr2020.hours).toLocaleString()} hrs`,
       evidence: [
-        makeEvidence('Listening hours in 2020', '2020', 1234.6, 'hours'),
+        makeEvidence('Listening hours in 2020', '2020', Number(yr2020.hours.toFixed(1)), 'hours'),
       ],
     },
 
@@ -24655,7 +24656,7 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       id: 'household',
       title: 'HOUSEHOLD',
       subtitle: 'Everyday Financial Activity',
-      recordCount: `${(household.totalRecords / 1000).toFixed(1)}K+ receipts`,
+      recordCount: `${household.totalRecords.toLocaleString()} receipts`,
       rawRecordCount: household.totalRecords,
       dateRange: `${household.dateRange.start.slice(0, 4)} â€” ${household.dateRange.end.slice(0, 4)}`,
       keyMetricLabel: 'Logged Outflow',
@@ -24668,14 +24669,14 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       id: 'transactions',
       title: 'TRANSACTIONS',
       subtitle: 'Point-of-Sale Card Commerce',
-      recordCount: `${(transactions.totalRecords / 1000).toFixed(1)}K+ receipts`,
+      recordCount: `${transactions.totalRecords.toLocaleString()} card txns`,
       rawRecordCount: transactions.totalRecords,
       dateRange: `${transactions.dateRange.start.slice(0, 4)} â€” ${transactions.dateRange.end.slice(0, 4)}`,
       keyMetricLabel: 'Commercial Outflow',
       keyMetricValue: `INR ${(transactions.totalAmount / 10000000).toFixed(2)} Cr`,
       accentColor: '#F59E0B',
       description: `Modern digital commerce spanning online shopping, entertainment, medical, and travel (avg INR ${travelCat?.avgAmount?.toFixed(0) || '5,556'}).`,
-      badge: 'Zero PII Scrubbed',
+      badge: 'PII SANITIZED Â· SAFE VIEW',
     },
   ];
 
@@ -24692,16 +24693,29 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
     if (hYear && hYear.count > 0) activeStreams.push('household');
     if (tYear && tYear.count > 0) activeStreams.push('transactions');
 
-    // Associated pattern/highlight for that year
+    // Associated pattern/highlight for that year (factual, derived from analytics)
     let notablePattern: string | undefined;
-    if (yr === 2015) notablePattern = 'Track skip rate peaked at 78.8% prior to structural shift';
-    else if (yr === 2016) notablePattern = 'Skip rate plunged to 3.6%; sustained Beatles playback emerged';
-    else if (yr === 2017) notablePattern = 'Synchronous overlap: 20K+ streams + peak domestic expense ledger';
-    else if (yr === 2018) notablePattern = 'Final domestic ledger year prior to digital card migration';
-    else if (yr === 2020) notablePattern = 'Acoustic Zenith: All-time high annual listening of 1,235 hours';
-    else if (yr === 2022) notablePattern = 'Card commerce telemetry begins across 4 digital retail facets';
-    else if (yr === 2023) notablePattern = 'High-velocity digital card commerce and e-commerce peak';
-    else if (yr === 2024) notablePattern = 'Contemporary multi-stream maturation';
+    if (yr === 2015) {
+      const skipRate = sYear?.skipRate ?? 78.8;
+      notablePattern = `Track skip rate observed at ${skipRate.toFixed(1)}% prior to structural transition`;
+    } else if (yr === 2016) {
+      const skipRate = sYear?.skipRate ?? 3.6;
+      notablePattern = `Skip rate decreased to ${skipRate.toFixed(1)}%; sustained playback engagement emerged`;
+    } else if (yr === 2017) {
+      const plays = sYear ? sYear.playCount.toLocaleString() : '20,000+';
+      notablePattern = `Concurrent activity: ${plays} audio plays recorded alongside domestic ledger entries`;
+    } else if (yr === 2018) {
+      notablePattern = 'Domestic ledger recording concluded';
+    } else if (yr === 2020) {
+      const hrs = sYear ? Math.round(sYear.hours).toLocaleString() : '1,235';
+      notablePattern = `Annual listening peak: ${hrs} hours recorded`;
+    } else if (yr === 2022) {
+      notablePattern = 'Card commerce telemetry begins across digital retail facets';
+    } else if (yr === 2023) {
+      notablePattern = 'Point-of-sale card commerce active across retail and travel categories';
+    } else if (yr === 2024) {
+      notablePattern = 'Contemporary multi-stream telemetry active';
+    }
 
     temporalYears.push({
       year: yr,
@@ -25069,11 +25083,16 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
     const topArtist = spotify.topArtists[0];
     const hourDisc = discoveries.find((d) => d.id === 'disc-spotify-hour-concentration') || discoveries[0];
 
+    const peakListening = (spotify.yearlyListening || []).reduce(
+      (max, y) => (y.hours > max.hours ? y : max),
+      spotify.yearlyListening?.[0] || { year: 2020, hours: 1234.6 }
+    );
+
     const listeningYearsPoints = (spotify.yearlyListening || []).map((y) => ({
       label: String(y.year),
       value: Math.round(y.hours),
-      highlight: y.year === 2020,
-      annotation: y.year === 2020 ? 'Zenith' : undefined,
+      highlight: y.year === peakListening.year,
+      annotation: y.year === peakListening.year ? 'Zenith' : undefined,
     }));
 
     chapters.push({
@@ -25112,15 +25131,10 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
       visualizationConfig: {
         type: 'area-trend',
         title: 'Annual Playback Hours Progression (2013â€“2024)',
-        dataPoints: listeningYearsPoints.length > 0 ? listeningYearsPoints : [
-          { label: '2015', value: 310 },
-          { label: '2018', value: 620 },
-          { label: '2020', value: 1235, highlight: true, annotation: 'Zenith' },
-          { label: '2024', value: 480 },
-        ],
+        dataPoints: listeningYearsPoints,
         unit: 'hrs',
-        deltaText: '1,234.6 peak hours recorded during 2020',
-        caption: 'Annual playback hours extracted from 149.8K normalized streaming timestamps.',
+        deltaText: `${Math.round(peakListening.hours).toLocaleString()} peak hours recorded during ${peakListening.year}`,
+        caption: `Annual playback hours extracted from ${spotify.totalRecords.toLocaleString()} normalized streaming timestamps.`,
       },
     });
   }
@@ -25239,8 +25253,8 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
           { label: apparelCat.category, value: Number(apparelCat.percentage.toFixed(1)) },
         ],
         unit: '%',
-        deltaText: 'Food accounts for 1 in every 3 logged entries (36.9%)',
-        caption: 'Distribution of manual domestic cashflow events logged across 4 consecutive calendar years.',
+        deltaText: `${foodCat.category} represents ${foodCat.percentage.toFixed(1)}% of all logged entries (${foodCat.count.toLocaleString()} entries)`,
+        caption: `Distribution of domestic cashflow events (${household.totalRecords.toLocaleString()} entries) logged across 4 consecutive calendar years.`,
       },
     });
   }
@@ -25253,6 +25267,9 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
     const onlineCat = transactions.categoryAmounts?.find((c) => c.category.toLowerCase().includes('online')) || { category: 'online_shopping', avgAmount: 5009, amount: 10700000 };
     const entertainCat = transactions.categoryAmounts?.find((c) => c.category.toLowerCase().includes('entertain')) || { category: 'entertainment', avgAmount: 5145, amount: 10464000 };
     const txnDisc = discoveries.find((d) => d.id === 'disc-txn-category-ticket-size') || discoveries.find((d) => d.source === 'transactions');
+    const retailAvg = onlineCat.avgAmount || 5009;
+    const travelAvg = travelCat.avgAmount || 5556;
+    const ticketDiffPct = Math.round(((travelAvg - retailAvg) / retailAvg) * 100);
 
     chapters.push({
       id: 'chapter-4-modern-commerce',
@@ -25298,8 +25315,8 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
           { label: 'Online Shopping', value: Math.round(onlineCat.avgAmount || 5009) },
         ],
         unit: 'â‚¹',
-        deltaText: 'Travel ticket averages 11% higher than everyday retail',
-        caption: 'Average transaction size across commercial merchant categories (PII scrubbed at source).',
+        deltaText: `Travel ticket averages ${ticketDiffPct}% higher than everyday retail (INR ${Math.round(travelAvg).toLocaleString()})`,
+        caption: `Average transaction size across commercial merchant categories (${transactions.totalRecords.toLocaleString()} transactions, PII scrubbed at source).`,
       },
     });
   }
@@ -26119,7 +26136,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Spotify Streaming History',
     tagline: '11-Year Auditory Footprint',
     timeRange: '2013 â€“ 2024',
-    recordCountEstimate: '~150,000 streams',
+    recordCountEstimate: '149,860 streams',
     unit: 'hours',
     accentColor: '#10B981', // Emerald
   },
@@ -26128,7 +26145,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Daily Household Ledger',
     tagline: 'Domestic Financial Micro-Journal',
     timeRange: '2015 â€“ 2018',
-    recordCountEstimate: '~2,500 records',
+    recordCountEstimate: '2,461 records',
     unit: 'INR',
     accentColor: '#38BDF8', // Celestial Cyan
   },
@@ -26137,7 +26154,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Multi-Facet Card Transact',
     tagline: 'Modern Digital Commerce Stream',
     timeRange: '2022 â€“ 2024',
-    recordCountEstimate: '~10,000 transactions',
+    recordCountEstimate: '8,725 transactions',
     unit: 'INR',
     accentColor: '#F59E0B', // Amber
   },

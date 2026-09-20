@@ -32,7 +32,7 @@ export function spotifyToReceipt(r: SpotifyNormalizedRecord, index: number): Exp
     supported.push({
       discoveryId: 'disc-spotify-hour-concentration',
       title: 'Listening Activity Concentrated in Evening and Late-Night Hours',
-      reason: `Recorded at ${String(r.hour).padStart(2, '0')}:00, within the evening/late-night window that represents 58.6% of all listening events.`,
+      reason: `Recorded at ${String(r.hour).padStart(2, '0')}:00, within the concentrated evening/late-night playback window.`,
     });
   }
 
@@ -41,7 +41,7 @@ export function spotifyToReceipt(r: SpotifyNormalizedRecord, index: number): Exp
     supported.push({
       discoveryId: 'disc-spotify-persistent-artist',
       title: 'Persistent Acoustic Pillar: The Beatles',
-      reason: 'Part of the 13,621 stream events that establish The Beatles as the primary multi-year loyalty artist across 2016–2024.',
+      reason: 'Part of the stream events that establish The Beatles as the primary multi-year loyalty artist.',
     });
   }
 
@@ -50,7 +50,7 @@ export function spotifyToReceipt(r: SpotifyNormalizedRecord, index: number): Exp
     supported.push({
       discoveryId: 'disc-spotify-skip-shift',
       title: 'Fundamental Behavioral Shift in Track Skip Rate (2015–2016)',
-      reason: 'Belongs to the 2015 baseline epoch where track skip rate reached 78.8% prior to the structural collapse to 3.6% in 2016.',
+      reason: 'Belongs to the 2015 baseline epoch prior to the structural collapse in track skip rate observed in 2016.',
     });
   }
 
@@ -59,7 +59,7 @@ export function spotifyToReceipt(r: SpotifyNormalizedRecord, index: number): Exp
     supported.push({
       discoveryId: 'disc-spotify-peak-eras',
       title: 'Acoustic Zenith: Peak Listening Recorded in 2020',
-      reason: 'Logged during the all-time peak playback year (1,234.6 total hours recorded).',
+      reason: 'Logged during the peak annual playback volume year in the observation window.',
     });
   }
 
@@ -104,7 +104,7 @@ export function householdToReceipt(r: HouseholdNormalizedRecord, index: number):
     supported.push({
       discoveryId: 'disc-household-food-dominance',
       title: 'Food Dominates Domestic Transaction Frequency',
-      reason: 'Contributes to the 36.9% share (907 records) making food the undisputed frequency anchor of manual domestic ledger tracking.',
+      reason: 'Contributes to making food the primary frequency anchor of manual domestic ledger tracking.',
     });
   }
 
