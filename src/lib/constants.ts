@@ -10,7 +10,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Spotify Streaming History',
     tagline: '11-Year Auditory Footprint',
     timeRange: '2013 – 2024',
-    recordCountEstimate: '~150,000 streams',
+    recordCountEstimate: '149,860 streams',
     unit: 'hours',
     accentColor: '#10B981', // Emerald
   },
@@ -19,7 +19,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Daily Household Ledger',
     tagline: 'Domestic Financial Micro-Journal',
     timeRange: '2015 – 2018',
-    recordCountEstimate: '~2,500 records',
+    recordCountEstimate: '2,461 records',
     unit: 'INR',
     accentColor: '#38BDF8', // Celestial Cyan
   },
@@ -28,7 +28,7 @@ export const DATASET_METADATA: Record<string, DatasetMeta> = {
     name: 'Multi-Facet Card Transact',
     tagline: 'Modern Digital Commerce Stream',
     timeRange: '2022 – 2024',
-    recordCountEstimate: '~10,000 transactions',
+    recordCountEstimate: '8,725 transactions',
     unit: 'INR',
     accentColor: '#F59E0B', // Amber
   },

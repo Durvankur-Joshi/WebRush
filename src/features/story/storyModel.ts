@@ -19,11 +19,16 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
     const topArtist = spotify.topArtists[0];
     const hourDisc = discoveries.find((d) => d.id === 'disc-spotify-hour-concentration') || discoveries[0];
 
+    const peakListening = (spotify.yearlyListening || []).reduce(
+      (max, y) => (y.hours > max.hours ? y : max),
+      spotify.yearlyListening?.[0] || { year: 2020, hours: 1234.6 }
+    );
+
     const listeningYearsPoints = (spotify.yearlyListening || []).map((y) => ({
       label: String(y.year),
       value: Math.round(y.hours),
-      highlight: y.year === 2020,
-      annotation: y.year === 2020 ? 'Zenith' : undefined,
+      highlight: y.year === peakListening.year,
+      annotation: y.year === peakListening.year ? 'Zenith' : undefined,
     }));
 
     chapters.push({
@@ -62,15 +67,10 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
       visualizationConfig: {
         type: 'area-trend',
         title: 'Annual Playback Hours Progression (2013–2024)',
-        dataPoints: listeningYearsPoints.length > 0 ? listeningYearsPoints : [
-          { label: '2015', value: 310 },
-          { label: '2018', value: 620 },
-          { label: '2020', value: 1235, highlight: true, annotation: 'Zenith' },
-          { label: '2024', value: 480 },
-        ],
+        dataPoints: listeningYearsPoints,
         unit: 'hrs',
-        deltaText: '1,234.6 peak hours recorded during 2020',
-        caption: 'Annual playback hours extracted from 149.8K normalized streaming timestamps.',
+        deltaText: `${Math.round(peakListening.hours).toLocaleString()} peak hours recorded during ${peakListening.year}`,
+        caption: `Annual playback hours extracted from ${spotify.totalRecords.toLocaleString()} normalized streaming timestamps.`,
       },
     });
   }
@@ -189,8 +189,8 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
           { label: apparelCat.category, value: Number(apparelCat.percentage.toFixed(1)) },
         ],
         unit: '%',
-        deltaText: 'Food accounts for 1 in every 3 logged entries (36.9%)',
-        caption: 'Distribution of manual domestic cashflow events logged across 4 consecutive calendar years.',
+        deltaText: `${foodCat.category} represents ${foodCat.percentage.toFixed(1)}% of all logged entries (${foodCat.count.toLocaleString()} entries)`,
+        caption: `Distribution of domestic cashflow events (${household.totalRecords.toLocaleString()} entries) logged across 4 consecutive calendar years.`,
       },
     });
   }
@@ -203,6 +203,9 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
     const onlineCat = transactions.categoryAmounts?.find((c) => c.category.toLowerCase().includes('online')) || { category: 'online_shopping', avgAmount: 5009, amount: 10700000 };
     const entertainCat = transactions.categoryAmounts?.find((c) => c.category.toLowerCase().includes('entertain')) || { category: 'entertainment', avgAmount: 5145, amount: 10464000 };
     const txnDisc = discoveries.find((d) => d.id === 'disc-txn-category-ticket-size') || discoveries.find((d) => d.source === 'transactions');
+    const retailAvg = onlineCat.avgAmount || 5009;
+    const travelAvg = travelCat.avgAmount || 5556;
+    const ticketDiffPct = Math.round(((travelAvg - retailAvg) / retailAvg) * 100);
 
     chapters.push({
       id: 'chapter-4-modern-commerce',
@@ -248,8 +251,8 @@ export function buildStoryViewModels(analytics: LifeAnalytics): StoryChapterView
           { label: 'Online Shopping', value: Math.round(onlineCat.avgAmount || 5009) },
         ],
         unit: '₹',
-        deltaText: 'Travel ticket averages 11% higher than everyday retail',
-        caption: 'Average transaction size across commercial merchant categories (PII scrubbed at source).',
+        deltaText: `Travel ticket averages ${ticketDiffPct}% higher than everyday retail (INR ${Math.round(travelAvg).toLocaleString()})`,
+        caption: `Average transaction size across commercial merchant categories (${transactions.totalRecords.toLocaleString()} transactions, PII scrubbed at source).`,
       },
     });
   }

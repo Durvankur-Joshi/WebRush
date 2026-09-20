@@ -11,6 +11,7 @@ export function buildConstellationGraph(analytics: LifeAnalytics): {
   const topArtist = spotify.topArtists[0] || { artist: 'The Beatles', playCount: 13621, hours: 336.2 };
   const yr2015 = spotify.yearlySkipRates.find((y) => y.year === 2015) || { skipRate: 78.8 };
   const yr2016 = spotify.yearlySkipRates.find((y) => y.year === 2016) || { skipRate: 3.6 };
+  const yr2020 = spotify.yearlyListening.find((y) => y.year === 2020) || { hours: 1234.6 };
   const foodCat = household.categoryFrequency.find((c) => c.category.toLowerCase().includes('food')) || {
     category: 'Food',
     count: 907,
@@ -204,12 +205,12 @@ export function buildConstellationGraph(analytics: LifeAnalytics): {
       whatItRepresents:
         'The calendar year with highest cumulative playback hours across the entire history.',
       whyItMatters:
-        'Signifies an era of intense music consumption, coinciding with global stay-at-home routines.',
+        'Recorded the highest annual cumulative playback hours across the 11-year observation window.',
       source: 'spotify',
       metricLabel: 'Peak Hours',
-      metricValue: '1,235 hrs',
+      metricValue: `${Math.round(yr2020.hours).toLocaleString()} hrs`,
       evidence: [
-        makeEvidence('Listening hours in 2020', '2020', 1234.6, 'hours'),
+        makeEvidence('Listening hours in 2020', '2020', Number(yr2020.hours.toFixed(1)), 'hours'),
       ],
     },
 

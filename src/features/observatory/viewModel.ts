@@ -86,7 +86,7 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       id: 'household',
       title: 'HOUSEHOLD',
       subtitle: 'Everyday Financial Activity',
-      recordCount: `${(household.totalRecords / 1000).toFixed(1)}K+ receipts`,
+      recordCount: `${household.totalRecords.toLocaleString()} receipts`,
       rawRecordCount: household.totalRecords,
       dateRange: `${household.dateRange.start.slice(0, 4)} — ${household.dateRange.end.slice(0, 4)}`,
       keyMetricLabel: 'Logged Outflow',
@@ -99,14 +99,14 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
       id: 'transactions',
       title: 'TRANSACTIONS',
       subtitle: 'Point-of-Sale Card Commerce',
-      recordCount: `${(transactions.totalRecords / 1000).toFixed(1)}K+ receipts`,
+      recordCount: `${transactions.totalRecords.toLocaleString()} card txns`,
       rawRecordCount: transactions.totalRecords,
       dateRange: `${transactions.dateRange.start.slice(0, 4)} — ${transactions.dateRange.end.slice(0, 4)}`,
       keyMetricLabel: 'Commercial Outflow',
       keyMetricValue: `INR ${(transactions.totalAmount / 10000000).toFixed(2)} Cr`,
       accentColor: '#F59E0B',
       description: `Modern digital commerce spanning online shopping, entertainment, medical, and travel (avg INR ${travelCat?.avgAmount?.toFixed(0) || '5,556'}).`,
-      badge: 'Zero PII Scrubbed',
+      badge: 'PII SANITIZED · SAFE VIEW',
     },
   ];
 
@@ -123,16 +123,29 @@ export function buildObservatoryViewModel(analytics: LifeAnalytics) {
     if (hYear && hYear.count > 0) activeStreams.push('household');
     if (tYear && tYear.count > 0) activeStreams.push('transactions');
 
-    // Associated pattern/highlight for that year
+    // Associated pattern/highlight for that year (factual, derived from analytics)
     let notablePattern: string | undefined;
-    if (yr === 2015) notablePattern = 'Track skip rate peaked at 78.8% prior to structural shift';
-    else if (yr === 2016) notablePattern = 'Skip rate plunged to 3.6%; sustained Beatles playback emerged';
-    else if (yr === 2017) notablePattern = 'Synchronous overlap: 20K+ streams + peak domestic expense ledger';
-    else if (yr === 2018) notablePattern = 'Final domestic ledger year prior to digital card migration';
-    else if (yr === 2020) notablePattern = 'Acoustic Zenith: All-time high annual listening of 1,235 hours';
-    else if (yr === 2022) notablePattern = 'Card commerce telemetry begins across 4 digital retail facets';
-    else if (yr === 2023) notablePattern = 'High-velocity digital card commerce and e-commerce peak';
-    else if (yr === 2024) notablePattern = 'Contemporary multi-stream maturation';
+    if (yr === 2015) {
+      const skipRate = sYear?.skipRate ?? 78.8;
+      notablePattern = `Track skip rate observed at ${skipRate.toFixed(1)}% prior to structural transition`;
+    } else if (yr === 2016) {
+      const skipRate = sYear?.skipRate ?? 3.6;
+      notablePattern = `Skip rate decreased to ${skipRate.toFixed(1)}%; sustained playback engagement emerged`;
+    } else if (yr === 2017) {
+      const plays = sYear ? sYear.playCount.toLocaleString() : '20,000+';
+      notablePattern = `Concurrent activity: ${plays} audio plays recorded alongside domestic ledger entries`;
+    } else if (yr === 2018) {
+      notablePattern = 'Domestic ledger recording concluded';
+    } else if (yr === 2020) {
+      const hrs = sYear ? Math.round(sYear.hours).toLocaleString() : '1,235';
+      notablePattern = `Annual listening peak: ${hrs} hours recorded`;
+    } else if (yr === 2022) {
+      notablePattern = 'Card commerce telemetry begins across digital retail facets';
+    } else if (yr === 2023) {
+      notablePattern = 'Point-of-sale card commerce active across retail and travel categories';
+    } else if (yr === 2024) {
+      notablePattern = 'Contemporary multi-stream telemetry active';
+    }
 
     temporalYears.push({
       year: yr,
