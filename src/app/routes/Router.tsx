@@ -20,7 +20,7 @@ export const AppRouter: React.FC<RouterProps> = ({ currentRoute, routeParams, on
     case 'discover':
       return <DiscoveriesView onNavigate={onRouteChange} />;
     case 'story':
-      return <StoryView />;
+      return <StoryView initialParams={routeParams} onNavigate={onRouteChange} />;
     default:
       return <ObservatoryView onNavigate={onRouteChange} />;
   }

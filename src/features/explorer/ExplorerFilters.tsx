@@ -19,6 +19,7 @@ export interface ExplorerFiltersProps {
   onResetFilters: () => void;
   onClearDiscoveryDrillDown?: () => void;
   onBackToDiscovery?: () => void;
+  onBackToStory?: (chapter?: string) => void;
 }
 
 export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
@@ -28,6 +29,7 @@ export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
   onResetFilters,
   onClearDiscoveryDrillDown,
   onBackToDiscovery,
+  onBackToStory,
 }) => {
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
@@ -118,20 +120,30 @@ export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Discovery Drill-Down Context Banner if active */}
+      {/* 1. Discovery / Story Drill-Down Context Banner if active */}
       {filters.discoveryDrillDown && (
         <div className="p-4 rounded-lg bg-accent-primary-dim/30 border border-accent-primary/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Badge variant="primary" size="sm" icon={<Sparkles className="w-3 h-3" />}>
-                EVIDENCE MODE
+                {filters.discoveryDrillDown.storyChapter ? 'STORY CONTEXT' : 'EVIDENCE MODE'}
               </Badge>
               <span className="font-mono text-[10px] text-content-dim uppercase">
-                Observed Pattern Drill-Down
+                {filters.discoveryDrillDown.storyChapter ? 'Narrative Ground Truth' : 'Observed Pattern Drill-Down'}
               </span>
             </div>
             <div className="text-sm font-bold text-content-main">
-              EXPLORING EVIDENCE FOR: <span className="text-accent-primary font-semibold">{filters.discoveryDrillDown.title}</span>
+              {filters.discoveryDrillDown.storyChapter ? (
+                <>
+                  Receipts supporting Chapter {filters.discoveryDrillDown.storyChapter}:{' '}
+                  <span className="text-accent-primary font-semibold">{filters.discoveryDrillDown.storyTitle}</span>
+                </>
+              ) : (
+                <>
+                  EXPLORING EVIDENCE FOR:{' '}
+                  <span className="text-accent-primary font-semibold">{filters.discoveryDrillDown.title}</span>
+                </>
+              )}
             </div>
             {filters.discoveryDrillDown.filterDescription && (
               <p className="text-xs text-content-muted">
@@ -141,7 +153,16 @@ export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
           </div>
 
           <div className="shrink-0 flex items-center gap-2">
-            {onBackToDiscovery && (
+            {filters.discoveryDrillDown.storyChapter && onBackToStory ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onBackToStory(filters.discoveryDrillDown?.storyChapter)}
+                className="text-xs font-mono"
+              >
+                Back to Story
+              </Button>
+            ) : onBackToDiscovery ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -150,7 +171,7 @@ export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
               >
                 Back to Discovery
               </Button>
-            )}
+            ) : null}
             {onClearDiscoveryDrillDown && (
               <Button
                 variant="outline"
@@ -159,7 +180,7 @@ export const ExplorerFilters: React.FC<ExplorerFiltersProps> = ({
                 icon={<X className="w-3.5 h-3.5" />}
                 className="text-xs font-mono"
               >
-                Clear Evidence Filter
+                {filters.discoveryDrillDown.storyChapter ? 'Clear Context' : 'Clear Evidence Filter'}
               </Button>
             )}
           </div>

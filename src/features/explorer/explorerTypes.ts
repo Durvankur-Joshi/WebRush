@@ -9,6 +9,8 @@ export interface DiscoveryDrillDownContext {
   summary: string;
   period?: string;
   filterDescription?: string;
+  storyChapter?: string;
+  storyTitle?: string;
 }
 
 export interface ExplorerFilterState {

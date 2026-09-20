@@ -66,23 +66,28 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNav
   const [streamError, setStreamError] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<ExplorerReceipt | null>(null);
 
-  // Handle Discovery Drill-Down from initialParams
+  // Handle Discovery / Story Drill-Down from initialParams
   useEffect(() => {
-    if (initialParams?.discoveryId && analytics?.discoveries) {
-      const disc = analytics.discoveries.find((d) => d.id === initialParams.discoveryId);
+    if ((initialParams?.discoveryId || initialParams?.storyChapter) && analytics?.discoveries) {
+      const disc = initialParams?.discoveryId
+        ? analytics.discoveries.find((d) => d.id === initialParams.discoveryId)
+        : undefined;
+
+      let stream: StreamId = (initialParams?.stream as StreamId) || filters.stream;
       if (disc) {
-        let stream: StreamId = filters.stream;
         if (disc.source === 'spotify') stream = 'spotify';
         else if (disc.source === 'household') stream = 'household';
         else if (disc.source === 'transactions') stream = 'transactions';
+      }
 
-        let targetYear: number | 'all' = 'all';
-        let targetCategory = 'all';
-        let targetHour: HourRange = 'all';
-        let targetSkipped: 'all' | 'skipped' | 'completed' = 'all';
-        let targetSearch = '';
-        let targetSort: SortOption = 'recent';
+      let targetYear: number | 'all' = initialParams?.year ? Number(initialParams.year) : 'all';
+      let targetCategory = initialParams?.category || 'all';
+      let targetHour: HourRange = (initialParams?.hourRange as HourRange) || 'all';
+      let targetSkipped: 'all' | 'skipped' | 'completed' = (initialParams?.skipped as 'all' | 'skipped' | 'completed') || 'all';
+      let targetSearch = initialParams?.search || '';
+      let targetSort: SortOption = (initialParams?.sortBy as SortOption) || 'recent';
 
+      if (disc) {
         if (disc.id === 'disc-spotify-hour-concentration') {
           targetHour = 'evening_night';
         } else if (disc.id === 'disc-spotify-persistent-artist') {
@@ -100,28 +105,32 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNav
           targetCategory = 'travel';
           targetSort = 'magnitude';
         }
-
-        setFilters((prev) => ({
-          ...prev,
-          stream,
-          year: targetYear,
-          category: targetCategory,
-          hourRange: targetHour,
-          skipped: targetSkipped,
-          search: targetSearch,
-          sortBy: targetSort,
-          page: 1,
-          discoveryDrillDown: {
-            id: disc.id,
-            title: disc.title,
-            summary: disc.subtitle,
-            period: disc.period,
-            filterDescription: `Pre-filtered to records verifying: "${disc.title}"`,
-          },
-        }));
       }
+
+      setFilters((prev) => ({
+        ...prev,
+        stream,
+        year: targetYear,
+        category: targetCategory,
+        hourRange: targetHour,
+        skipped: targetSkipped,
+        search: targetSearch,
+        sortBy: targetSort,
+        page: 1,
+        discoveryDrillDown: {
+          id: disc?.id || `story-ch-${initialParams?.storyChapter}`,
+          title: initialParams?.storyTitle || disc?.title || `Chapter ${initialParams?.storyChapter}`,
+          summary: disc?.subtitle || 'Receipt evidence validating narrative chapter',
+          period: disc?.period,
+          filterDescription: initialParams?.storyChapter
+            ? `Receipts supporting Chapter ${initialParams.storyChapter}: ${initialParams.storyTitle || disc?.title || ''}`
+            : `Pre-filtered to records verifying: "${disc?.title}"`,
+          storyChapter: initialParams?.storyChapter,
+          storyTitle: initialParams?.storyTitle || disc?.title,
+        },
+      }));
     }
-  }, [initialParams?.discoveryId, analytics?.discoveries]);
+  }, [initialParams?.discoveryId, initialParams?.storyChapter, analytics?.discoveries]);
 
   // Load Stream Data when activeStream changes
   useEffect(() => {
@@ -295,6 +304,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNav
             onResetFilters={handleResetFilters}
             onClearDiscoveryDrillDown={handleClearDiscoveryDrillDown}
             onBackToDiscovery={() => onNavigate?.('observatory')}
+            onBackToStory={(ch) => onNavigate?.('story', ch ? { chapter: ch } : undefined)}
           />
 
           {/* Explorer Summary & Sorting Bar */}
