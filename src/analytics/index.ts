@@ -99,7 +99,10 @@ export async function getLifeAnalytics(): Promise<LifeAnalytics> {
     // 1. Attempt to fetch precomputed compact analytics if available
     try {
       if (typeof fetch !== 'undefined') {
-        const precomputedRes = await fetch('/data/life_analytics.json');
+        const meta = typeof import.meta !== 'undefined' ? (import.meta as Record<string, any>) : undefined;
+        const base = meta?.env?.BASE_URL ? (meta.env.BASE_URL as string) : '/';
+        const analyticsPath = `${base.replace(/\/$/, '')}/data/life_analytics.json`;
+        const precomputedRes = await fetch(analyticsPath);
         if (precomputedRes.ok) {
           const data = (await precomputedRes.json()) as LifeAnalytics;
           _lifeAnalyticsCache = data;

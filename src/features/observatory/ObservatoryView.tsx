@@ -11,6 +11,7 @@ import { ConstellationSection } from './ConstellationSection';
 import { DiscoveryPreview } from './DiscoveryPreview';
 import { TemporalJourney } from './TemporalJourney';
 import { DataStreams } from './DataStreams';
+import { DiscoveryPipelineSection } from './DiscoveryPipelineSection';
 
 export interface ObservatoryViewProps {
   onNavigate?: (route: RouteId, params?: Record<string, string>) => void;
@@ -85,7 +86,10 @@ export const ObservatoryView: React.FC<ObservatoryViewProps> = ({ onNavigate }) 
       {/* 3. LIFE CONSTELLATION (MAIN VISUAL & INTERACTION) */}
       <ConstellationSection analytics={analytics} />
 
-      {/* 4. KEY DISCOVERIES & SHOW EVIDENCE */}
+      {/* 4. DISCOVERY ENGINE INNOVATION PIPELINE */}
+      <DiscoveryPipelineSection />
+
+      {/* 5. KEY DISCOVERIES & SHOW EVIDENCE */}
       <DiscoveryPreview
         discoveries={viewModel.topDiscoveries}
         onViewAllDiscoveries={() => onNavigate?.('discover')}

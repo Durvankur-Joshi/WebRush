@@ -12,11 +12,10 @@ import {
   computeExplorerSummary,
   extractFilterOptions,
   filterReceipts,
-  householdToReceipt,
   paginateReceipts,
   sortReceipts,
-  spotifyToReceipt,
-  transactionToReceipt,
+  loadStreamReceipts,
+  clearStreamReceiptCache,
 } from './explorerModel';
 import { ExplorerToolbar } from './ExplorerToolbar';
 import { ExplorerFilters } from './ExplorerFilters';
@@ -24,17 +23,11 @@ import { ExplorerSummary } from './ExplorerSummary';
 import { ExplorerResults } from './ExplorerResults';
 import { ExplorerDetailPanel } from './ExplorerDetailPanel';
 import { ErrorState } from '../../components/ui/ErrorState';
-import { loadSpotifyData } from '../../data/spotify/loader';
-import { loadHouseholdData } from '../../data/household/loader';
-import { loadTransactionData } from '../../data/transactions/loader';
 
 export interface ExplorerViewProps {
   initialParams?: Record<string, string>;
   onNavigate?: (route: RouteId, params?: Record<string, string>) => void;
 }
-
-// In-memory cache for transformed receipts so stream switching is near-instant
-const _receiptCache = new Map<StreamId, ExplorerReceipt[]>();
 
 export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNavigate }) => {
   const { analytics } = useLifeAnalytics();
@@ -137,35 +130,11 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNav
     let isCancelled = false;
 
     async function loadDataForStream(stream: StreamId) {
-      // Check cache first
-      if (_receiptCache.has(stream)) {
-        setStreamReceipts(_receiptCache.get(stream)!);
-        setLoadingStream(false);
-        setStreamError(null);
-        return;
-      }
-
       setLoadingStream(true);
       setStreamError(null);
 
       try {
-        let receipts: ExplorerReceipt[] = [];
-
-        if (stream === 'spotify') {
-          const res = await loadSpotifyData();
-          if (isCancelled) return;
-          receipts = res.records.map((r, i) => spotifyToReceipt(r, i));
-        } else if (stream === 'household') {
-          const res = await loadHouseholdData();
-          if (isCancelled) return;
-          receipts = res.records.map((r, i) => householdToReceipt(r, i));
-        } else if (stream === 'transactions') {
-          const res = await loadTransactionData();
-          if (isCancelled) return;
-          receipts = res.records.map((r, i) => transactionToReceipt(r, i));
-        }
-
-        _receiptCache.set(stream, receipts);
+        const receipts = await loadStreamReceipts(stream);
         if (!isCancelled) {
           setStreamReceipts(receipts);
           setLoadingStream(false);
@@ -285,7 +254,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNav
             title="EXPLORER DATA UNAVAILABLE"
             message={streamError}
             onRetry={() => {
-              _receiptCache.delete(filters.stream);
+              clearStreamReceiptCache(filters.stream);
               setFilters((prev) => ({ ...prev }));
             }}
             className="w-full max-w-md"

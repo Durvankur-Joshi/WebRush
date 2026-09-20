@@ -6,9 +6,14 @@ import {
   StreamId,
   SupportedDiscoveryLink,
 } from './explorerTypes';
-import { SpotifyNormalizedRecord } from '../../data/spotify/types';
-import { HouseholdNormalizedRecord } from '../../data/household/types';
-import { TransactionNormalizedRecord } from '../../data/transactions/types';
+import {
+  SpotifyNormalizedRecord,
+  HouseholdNormalizedRecord,
+  TransactionNormalizedRecord,
+  loadSpotifyData,
+  loadHouseholdData,
+  loadTransactionData,
+} from '../../data';
 
 // Format milliseconds to mm:ss or hh:mm
 export function formatDuration(ms: number): string {
@@ -421,3 +426,40 @@ export function extractFilterOptions(receipts: ExplorerReceipt[]) {
 
   return { years, categories, subcategories, modes, states };
 }
+
+// Stream Receipt In-Memory Cache
+const _receiptCache = new Map<StreamId, ExplorerReceipt[]>();
+
+/**
+ * Loads and transforms raw stream records into ExplorerReceipts.
+ * Uses an in-memory cache to ensure instant tab switching.
+ */
+export async function loadStreamReceipts(stream: StreamId): Promise<ExplorerReceipt[]> {
+  if (_receiptCache.has(stream)) {
+    return _receiptCache.get(stream)!;
+  }
+
+  let receipts: ExplorerReceipt[] = [];
+  if (stream === 'spotify') {
+    const res = await loadSpotifyData();
+    receipts = res.records.map((r, i) => spotifyToReceipt(r, i));
+  } else if (stream === 'household') {
+    const res = await loadHouseholdData();
+    receipts = res.records.map((r, i) => householdToReceipt(r, i));
+  } else if (stream === 'transactions') {
+    const res = await loadTransactionData();
+    receipts = res.records.map((r, i) => transactionToReceipt(r, i));
+  }
+
+  _receiptCache.set(stream, receipts);
+  return receipts;
+}
+
+export function clearStreamReceiptCache(stream?: StreamId): void {
+  if (stream) {
+    _receiptCache.delete(stream);
+  } else {
+    _receiptCache.clear();
+  }
+}
+
