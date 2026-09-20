@@ -1,183 +1,393 @@
-import React from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { RouteId } from '../../types/common';
+import { useLifeAnalytics } from '../../hooks';
+import { LoadingState } from '../../components/ui/LoadingState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { SectionHeader } from '../../components/ui/SectionHeader';
-import { Card, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import {
+  DiscoveryFilterType,
+  DiscoverySortOption,
+  DiscoveryViewModel,
+} from './discoveryTypes';
+import {
+  buildDiscoveryViewModels,
+  computeDiscoveriesSummary,
+  filterDiscoveries,
+  sortDiscoveries,
+} from './discoveryModel';
+import { DiscoveriesHero } from './DiscoveriesHero';
+import { DiscoveryFilters } from './DiscoveryFilters';
+import { DiscoveryGrid } from './DiscoveryGrid';
+import { DiscoveryEvidencePanel } from './DiscoveryEvidencePanel';
+import {
+  buildConstellationGraph,
+  ConstellationCanvas,
+  ConstellationDetailPanel,
+  ConstellationNodeData,
+} from '../constellation';
+import {
+  Compass,
+  Sparkles,
+  RefreshCw,
+  HelpCircle,
+  ShieldCheck,
+  ArrowRight,
+  TrendingUp,
+} from 'lucide-react';
 import { CAUSALITY_DISCLAIMER } from '../../lib/constants';
 
-export const DiscoveriesView: React.FC = () => {
+export interface DiscoveriesViewProps {
+  onNavigate?: (route: RouteId, params?: Record<string, string>) => void;
+}
+
+export const DiscoveriesView: React.FC<DiscoveriesViewProps> = ({ onNavigate }) => {
+  const { analytics, loading, error, reload } = useLifeAnalytics();
+
+  // Filter & Search State
+  const [activeFilter, setActiveFilter] = useState<DiscoveryFilterType>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<DiscoverySortOption>('confidence');
+
+  // Modal Evidence Panel State
+  const [inspectingDiscovery, setInspectingDiscovery] = useState<DiscoveryViewModel | null>(null);
+
+  // Constellation Selection State
+  const [selectedNode, setSelectedNode] = useState<ConstellationNodeData | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<ConstellationNodeData | null>(null);
+
+  // Memoized View Models
+  const allViewModels = useMemo(() => {
+    if (!analytics) return [];
+    return buildDiscoveryViewModels(analytics);
+  }, [analytics]);
+
+  const filteredDiscoveries = useMemo(() => {
+    const filtered = filterDiscoveries(allViewModels, activeFilter, searchQuery);
+    return sortDiscoveries(filtered, sortBy);
+  }, [allViewModels, activeFilter, searchQuery, sortBy]);
+
+  const summaryMetrics = useMemo(() => {
+    if (!analytics) {
+      return {
+        totalDiscoveries: 0,
+        totalConnections: 0,
+        totalStreams: 3,
+        criticalCount: 0,
+        highConfidenceCount: 0,
+      };
+    }
+    return computeDiscoveriesSummary(analytics);
+  }, [analytics]);
+
+  const constellationGraph = useMemo(() => {
+    if (!analytics) return { nodes: [], edges: [] };
+    return buildConstellationGraph(analytics);
+  }, [analytics]);
+
+  // Handler: Drill-down to Explorer from Discovery
+  const handleExploreReceipts = useCallback(
+    (discovery: DiscoveryViewModel) => {
+      onNavigate?.('explore', discovery.drillDownParams);
+    },
+    [onNavigate]
+  );
+
+  // Handler: Drill-down to Explorer from Constellation Node
+  const handleExploreConstellationNode = useCallback(
+    (node: ConstellationNodeData) => {
+      let params: Record<string, string> = { stream: 'spotify' };
+
+      if (node.id === 'stream-spotify') params = { stream: 'spotify' };
+      else if (node.id === 'stream-household') params = { stream: 'household' };
+      else if (node.id === 'stream-transactions') params = { stream: 'transactions' };
+      else if (node.id.includes('beatles')) params = { stream: 'spotify', search: 'Beatles' };
+      else if (node.id.includes('skip')) params = { stream: 'spotify', year: '2015', skipped: 'skipped' };
+      else if (node.id.includes('2020')) params = { stream: 'spotify', year: '2020' };
+      else if (node.id.includes('food')) params = { stream: 'household', category: 'Food' };
+      else if (node.id.includes('money-transfer')) params = { stream: 'household', category: 'Money transfer', sortBy: 'magnitude' };
+      else if (node.id.includes('travel')) params = { stream: 'transactions', category: 'travel', sortBy: 'magnitude' };
+      else if (node.id.includes('online')) params = { stream: 'transactions', category: 'online_shopping' };
+      else if (node.id.includes('tamil')) params = { stream: 'transactions', state: 'Tamil Nadu' };
+      else params = { stream: node.source === 'cross-temporal' ? 'spotify' : node.source };
+
+      onNavigate?.('explore', params);
+    },
+    [onNavigate]
+  );
+
+  // Loading State
+  if (loading) {
+    return (
+      <div className="py-20 flex items-center justify-center animate-fadeIn">
+        <LoadingState
+          message="MAPPING YOUR PATTERNS..."
+          subtext="Evaluating statistical thresholds, synthesizing verified discoveries, and plotting the celestial constellation..."
+          className="w-full max-w-lg"
+        />
+      </div>
+    );
+  }
+
+  // Error State
+  if (error || !analytics) {
+    return (
+      <div className="py-20 flex items-center justify-center animate-fadeIn">
+        <ErrorState
+          title="DISCOVERIES UNAVAILABLE"
+          message={error || 'Your discoveries could not be loaded.'}
+          onRetry={reload}
+          className="w-full max-w-lg"
+        />
+      </div>
+    );
+  }
+
+  // Empty State
+  if (analytics.discoveries.length === 0) {
+    return (
+      <div className="py-20 flex items-center justify-center animate-fadeIn">
+        <EmptyState
+          title="NO STRONG PATTERNS DETECTED"
+          description="The analytics engine found no recurring patterns meeting the rigorous empirical confidence threshold."
+          className="w-full max-w-lg"
+        />
+      </div>
+    );
+  }
+
+  const totalReceipts = analytics.spotify.totalRecords + analytics.household.totalRecords + analytics.transactions.totalRecords;
+
   return (
-    <div className="space-y-8 animate-fadeIn">
-      <SectionHeader
-        tag="ALGORITHMIC ENGINE // PATTERNS & ANOMALIES"
-        title="Pattern Discoveries & Evidence"
-        description="Statistically derived behavioral shifts, financial rhythms, and acoustic signatures extracted with rigorous evidentiary proof."
-        level="h1"
-        action={
-          <Badge variant="outline" size="md" icon={<CheckCircle2 className="w-3.5 h-3.5 text-accent-emerald" />}>
-            Evidence-Backed Insights
-          </Badge>
-        }
+    <div className="space-y-16 sm:space-y-20 animate-fadeIn pb-20">
+      {/* 1. DISCOVERIES HERO */}
+      <DiscoveriesHero
+        metrics={summaryMetrics}
+        totalReceiptsFormatted={`${totalReceipts.toLocaleString()}+`}
       />
 
-      {/* Scientific Methodology Note */}
-      <Card variant="subtle" padding="sm" className="border-accent-primary/20 bg-accent-primary-dim/10">
-        <div className="flex items-start gap-3 text-xs text-content-muted">
-          <Sparkles className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-          <div>
-            <span className="text-content-main font-semibold">Evidentiary Paradigm:</span>{' '}
-            No insight exists without empirical backing. Every card below lists the ground-truth dataset, observed 
-            statistical frequency, sample size, and confidence score. Cross-dataset comparisons are strictly non-causal.
+      {/* 2. DISCOVERIES GRID & FILTERS */}
+      <section id="discoveries-feed" className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <SectionHeader
+            tag="ALGORITHMIC FINDINGS // PATTERNS & SHIFTS"
+            title="Verified Discoveries"
+            description="Algorithmic patterns verified against ground-truth receipts. Select any discovery to inspect its evidentiary breakdown or drill down to raw records."
+            level="h2"
+          />
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Badge variant="success" size="md" icon={<ShieldCheck className="w-3.5 h-3.5" />}>
+              PII Sanitized
+            </Badge>
           </div>
         </div>
-      </Card>
 
-      {/* Discovery Insights Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Insight 1: Auditory Gravitational Anchor */}
-        <Card variant="default" className="space-y-4">
-          <CardHeader
-            title="Acoustic Gravitational Anchor"
-            subtitle="Audio Signature Pattern"
-            action={
-              <Badge variant="primary" size="sm">
-                Spotify Stream
-              </Badge>
-            }
+        {/* Filter Controls & Search */}
+        <DiscoveryFilters
+          activeFilter={activeFilter}
+          onSelectFilter={setActiveFilter}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          totalMatching={filteredDiscoveries.length}
+        />
+
+        {/* Discoveries Feed (Featured + Grid) */}
+        <DiscoveryGrid
+          discoveries={filteredDiscoveries}
+          onShowEvidence={(disc) => setInspectingDiscovery(disc)}
+          onExploreReceipts={handleExploreReceipts}
+          onResetFilters={() => {
+            setActiveFilter('ALL');
+            setSearchQuery('');
+          }}
+        />
+      </section>
+
+      {/* 3. LIFE CONSTELLATION VISUALIZATION */}
+      <section id="discoveries-constellation" className="space-y-6 pt-4 border-t border-border/70">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <SectionHeader
+            tag="RELATIONSHIP GRAPH // LIFE CONSTELLATION"
+            title="See How Your Patterns Connect"
+            description="A visual knowledge graph representing relationships between your core life streams, dominant categories, milestone years, and observed discoveries."
+            level="h2"
           />
-          <p className="text-sm text-content-main leading-relaxed">
-            The top 3 recurring artists account for a disproportionate volume of overall listening time across 11 years, 
-            demonstrating an acoustic anchor effect resilient to playlist churn.
-          </p>
 
-          <div className="p-3 rounded bg-surface-elevated border border-border-subtle space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-content-dim uppercase">Evidentiary Metric:</span>
-              <span className="font-mono text-accent-primary font-semibold">Top 3 Concentration Ratio</span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {selectedNode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedNode(null)}
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+                className="text-xs font-mono"
+              >
+                Reset Graph View
+              </Button>
+            )}
+            <Badge variant="primary" size="md" icon={<Sparkles className="w-3.5 h-3.5" />}>
+              {constellationGraph.nodes.length} Interconnected Nodes
+            </Badge>
+          </div>
+        </div>
+
+        {/* Constellation Canvas + Node Detail Inspector Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* SVG Canvas */}
+          <div className="lg:col-span-8 rounded-xl border border-border/80 bg-surface/60 backdrop-blur-md overflow-hidden relative shadow-2xl">
+            {/* Top Legend Bar */}
+            <div className="p-3 border-b border-border/70 bg-surface-elevated/40 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-accent-primary animate-spin-slow" />
+                <span className="font-semibold text-content-main">
+                  Celestial Knowledge Network
+                </span>
+              </div>
+
+              {/* Color Categories Legend */}
+              <div className="flex items-center gap-3 text-[10px] text-content-muted flex-wrap">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-accent-primary" /> Music
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-accent-emerald" /> Household
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-accent-secondary" /> Card Commerce
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-pink-500" /> Discovery
+                </span>
+                <span className="flex items-center gap-1 opacity-70">
+                  <span className="w-3 h-0.5 border-t border-dashed border-slate-400" /> Temporal Link
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Observed Value:</span>
-              <span className="font-mono text-content-main font-bold">~34.2% total hours</span>
+
+            {/* Interactive SVG Canvas */}
+            <div className="p-2 sm:p-4 bg-background/50">
+              <ConstellationCanvas
+                nodes={constellationGraph.nodes}
+                edges={constellationGraph.edges}
+                selectedNode={selectedNode}
+                hoveredNode={hoveredNode}
+                onSelectNode={setSelectedNode}
+                onHoverNode={setHoveredNode}
+              />
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Sample Size:</span>
-              <span className="font-mono text-content-main">150,000+ streams (2013–2024)</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Confidence Score:</span>
-              <span className="font-mono text-accent-emerald font-semibold">99.2%</span>
+
+            {/* Keyboard & Accessibility Hint */}
+            <div className="px-4 py-2 border-t border-border/60 bg-surface-elevated/20 flex items-center justify-between text-[11px] text-content-dim font-mono flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <HelpCircle className="w-3.5 h-3.5 text-accent-primary" />
+                <span>Click or focus any node to inspect telemetry. Press <kbd className="px-1 py-0.5 rounded bg-surface border border-border">Esc</kbd> to clear.</span>
+              </div>
+              <span className="text-[10px] text-accent-emerald">✓ High Performance SVG</span>
             </div>
           </div>
-        </Card>
 
-        {/* Insight 2: Domestic Financial Primacy */}
-        <Card variant="default" className="space-y-4">
-          <CardHeader
-            title="Domestic Capital Regularity"
-            subtitle="Financial Rhythm Pattern"
-            action={
-              <Badge variant="primary" size="sm">
-                Household Ledger
-              </Badge>
-            }
-          />
-          <p className="text-sm text-content-main leading-relaxed">
-            Food and essentials dominate recurring domestic outlays between 2015 and 2018, exhibiting high-frequency 
-            cash transactions with tightly bounded standard deviation.
-          </p>
-
-          <div className="p-3 rounded bg-surface-elevated border border-border-subtle space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-content-dim uppercase">Evidentiary Metric:</span>
-              <span className="font-mono text-accent-primary font-semibold">Primary Category Share</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Observed Value:</span>
-              <span className="font-mono text-content-main font-bold">42.8% expense volume</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Sample Size:</span>
-              <span className="font-mono text-content-main">2,400+ ledger lines (2015–2018)</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Confidence Score:</span>
-              <span className="font-mono text-accent-emerald font-semibold">96.5%</span>
-            </div>
+          {/* Node Inspector Detail Panel */}
+          <div className="lg:col-span-4 h-full min-h-[420px]">
+            <ConstellationDetailPanel
+              node={selectedNode || hoveredNode}
+              onClose={() => {
+                setSelectedNode(null);
+                setHoveredNode(null);
+              }}
+              onExploreReceipts={handleExploreConstellationNode}
+            />
           </div>
-        </Card>
+        </div>
+      </section>
 
-        {/* Insight 3: Temporal Parallelism */}
-        <Card variant="default" className="space-y-4">
-          <CardHeader
-            title="Concurrent Life Ledger & Soundtrack (2015–2018)"
-            subtitle="Longitudinal Temporal Comparison"
-            action={
-              <Badge variant="secondary" size="sm">
-                Cross-Temporal
-              </Badge>
-            }
-          />
-          <p className="text-sm text-content-main leading-relaxed">
-            During the 4-year domestic logging period, the auditory stream captured continuous background consumption, 
-            revealing a synchrony between physical household maintenance and acoustic focus sessions.
-          </p>
+      {/* 4. MEANINGFUL CONNECTIONS (CONNECTION ENGINE) */}
+      <section id="discoveries-connections" className="space-y-6 pt-4 border-t border-border/70">
+        <SectionHeader
+          tag="CONNECTION ENGINE // RELATIONSHIP EVIDENCE"
+          title="Cross-Dimension Connections"
+          description="Legitimate analytical relationships observed across time periods, activity domains, and financial facets. Temporal overlaps are strictly non-causal."
+          level="h2"
+        />
 
-          <div className="p-3 rounded bg-surface-elevated border border-border-subtle space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-content-dim uppercase">Active Streams:</span>
-              <span className="font-mono text-content-main">Household (2015–18) & Spotify (2015–18)</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Temporal Alignment:</span>
-              <span className="font-mono text-accent-secondary font-bold">48 Concurrent Months</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Causality Principle:</span>
-              <span className="font-mono text-content-dim">Comparative correlation only</span>
-            </div>
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {analytics.connections.map((conn) => {
+            const isTemporalComparison = conn.type === 'TEMPORAL_COMPARISON';
 
-        {/* Insight 4: POS Card Security Integrity */}
-        <Card variant="default" className="space-y-4">
-          <CardHeader
-            title="Digital POS Security & Anomaly Boundary"
-            subtitle="Anomaly Detection"
-            action={
-              <Badge variant="outline" size="sm">
-                Card Transact
-              </Badge>
-            }
-          />
-          <p className="text-sm text-content-main leading-relaxed">
-            Card transaction records demonstrate concentrated standard commerce patterns, with isolated flagged anomalies 
-            remaining below normal consumer volatility thresholds.
-          </p>
+            return (
+              <div
+                key={conn.id}
+                className="p-5 rounded-lg border border-border/80 bg-surface/50 hover:border-border transition-all space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <Badge
+                    variant={isTemporalComparison ? 'default' : 'primary'}
+                    size="sm"
+                    className="font-mono text-[10px]"
+                  >
+                    {isTemporalComparison ? 'TEMPORAL COMPARISON' : 'INTRA-STREAM RELATIONSHIP'}
+                  </Badge>
 
-          <div className="p-3 rounded bg-surface-elevated border border-border-subtle space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-content-dim uppercase">Evidentiary Metric:</span>
-              <span className="font-mono text-accent-primary font-semibold">Flagged Anomaly Ratio</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Observed Value:</span>
-              <span className="font-mono text-content-main font-bold">&lt; 0.5% fraud flagged</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-content-muted">Data Protection:</span>
-              <span className="font-mono text-accent-emerald">Zero raw card numbers stored</span>
-            </div>
-          </div>
-        </Card>
-      </div>
+                  <span className="text-[11px] font-mono text-accent-emerald flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    {Math.round(conn.strength * 100)}% Match
+                  </span>
+                </div>
 
-      {/* Causality Disclaimer */}
-      <div className="p-4 rounded-lg bg-surface/50 border border-border-subtle flex items-start gap-3">
-        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-content-muted leading-relaxed">
-          <span className="text-content-main font-semibold">Causality Guardrail:</span> {CAUSALITY_DISCLAIMER}
-        </p>
-      </div>
+                {/* Connection Nodes Flow */}
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-content-main pt-1 flex-wrap">
+                  <span className="px-2 py-1 rounded bg-surface-elevated border border-border">
+                    {conn.from}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-accent-primary shrink-0" />
+                  <span className="px-2 py-1 rounded bg-surface-elevated border border-border text-accent-primary">
+                    {conn.to}
+                  </span>
+                </div>
+
+                <p className="text-xs text-content-muted leading-relaxed">
+                  {conn.explanation}
+                </p>
+
+                {/* Evidence Metrics */}
+                {conn.evidence.length > 0 && (
+                  <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-[11px] font-mono text-content-dim">
+                    <span>{conn.evidence[0].metric}:</span>
+                    <span className="text-content-main font-bold">
+                      {typeof conn.evidence[0].value === 'number'
+                        ? conn.evidence[0].value.toLocaleString()
+                        : conn.evidence[0].value}{' '}
+                      {conn.evidence[0].unit}
+                    </span>
+                  </div>
+                )}
+
+                {isTemporalComparison && (
+                  <div className="pt-1 text-[10px] font-mono text-accent-secondary">
+                    * Temporal comparative observation. No causal link implied.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Causality Disclaimer */}
+        <div className="p-3.5 rounded-lg bg-surface/40 border border-border-subtle text-xs text-content-dim leading-relaxed font-mono">
+          <strong className="text-content-main">Analytical Grounding Policy:</strong> {CAUSALITY_DISCLAIMER}
+        </div>
+      </section>
+
+      {/* 5. EVIDENCE PANEL MODAL */}
+      <DiscoveryEvidencePanel
+        discovery={inspectingDiscovery}
+        onClose={() => setInspectingDiscovery(null)}
+        onExploreReceipts={handleExploreReceipts}
+      />
     </div>
   );
 };

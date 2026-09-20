@@ -18,7 +18,7 @@ export const AppRouter: React.FC<RouterProps> = ({ currentRoute, routeParams, on
     case 'explore':
       return <ExplorerView initialParams={routeParams} onNavigate={onRouteChange} />;
     case 'discover':
-      return <DiscoveriesView />;
+      return <DiscoveriesView onNavigate={onRouteChange} />;
     case 'story':
       return <StoryView />;
     default:

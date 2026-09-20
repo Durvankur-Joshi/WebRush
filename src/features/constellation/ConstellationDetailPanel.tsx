@@ -2,17 +2,19 @@ import React from 'react';
 import { ConstellationNodeData } from './types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { X, ShieldAlert, Sparkles, Activity, FileText } from 'lucide-react';
+import { X, ShieldAlert, Sparkles, Activity, FileText, ArrowRight } from 'lucide-react';
 import { CAUSALITY_DISCLAIMER } from '../../lib/constants';
 
 export interface ConstellationDetailPanelProps {
   node: ConstellationNodeData | null;
   onClose: () => void;
+  onExploreReceipts?: (node: ConstellationNodeData) => void;
 }
 
 export const ConstellationDetailPanel: React.FC<ConstellationDetailPanelProps> = ({
   node,
   onClose,
+  onExploreReceipts,
 }) => {
   if (!node) {
     return (
@@ -140,12 +142,26 @@ export const ConstellationDetailPanel: React.FC<ConstellationDetailPanelProps> =
         )}
       </div>
 
-      {/* Footer instruction */}
-      <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-[10px] text-content-dim font-mono">
+      {/* Footer instruction & Explorer drilldown */}
+      <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-2 text-[10px] text-content-dim font-mono flex-wrap">
         <span>Press <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-content-muted">Esc</kbd> to clear</span>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 text-[10px] px-2">
-          Dismiss
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-7 text-[11px] px-2 font-mono">
+            Dismiss
+          </Button>
+          {onExploreReceipts && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onExploreReceipts(node)}
+              icon={<ArrowRight className="w-3.5 h-3.5" />}
+              iconPosition="right"
+              className="h-7 text-[11px] px-2.5 font-bold font-mono"
+            >
+              Explore In Receipts
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
