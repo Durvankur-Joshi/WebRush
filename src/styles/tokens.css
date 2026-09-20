@@ -1,0 +1,32 @@
+:root {
+  /* Core Canvas & Surfaces */
+  --color-background: #080B11;
+  --color-surface: #0E1523;
+  --color-surface-elevated: #152033;
+  --color-surface-muted: #1B283E;
+
+  /* Structural Precision Borders */
+  --color-border: #22324B;
+  --color-border-subtle: #172335;
+  --color-border-highlight: #38BDF8;
+
+  /* Typography Colors */
+  --color-text-main: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-dim: #64748B;
+
+  /* Observatory Spectrum Accents */
+  --color-accent-primary: #38BDF8;
+  --color-accent-primary-dim: rgba(56, 189, 248, 0.14);
+  --color-accent-secondary: #F59E0B;
+  --color-accent-secondary-dim: rgba(245, 158, 11, 0.14);
+  --color-accent-emerald: #10B981;
+  --color-accent-emerald-dim: rgba(16, 185, 129, 0.14);
+  --color-accent-purple: #A855F7;
+  --color-accent-purple-dim: rgba(168, 85, 247, 0.14);
+
+  /* Geometry & Grid */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
