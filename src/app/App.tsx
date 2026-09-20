@@ -5,12 +5,12 @@ import { useNavigation } from '../hooks/useNavigation';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { currentRoute, navigate } = useNavigation('observatory');
+  const { currentRoute, routeParams, navigate } = useNavigation('observatory');
 
   return (
     <ErrorBoundary>
       <Shell currentRoute={currentRoute} onRouteChange={navigate}>
-        <AppRouter currentRoute={currentRoute} onRouteChange={navigate} />
+        <AppRouter currentRoute={currentRoute} routeParams={routeParams} onRouteChange={navigate} />
       </Shell>
     </ErrorBoundary>
   );

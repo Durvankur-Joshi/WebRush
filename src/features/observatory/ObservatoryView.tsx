@@ -13,7 +13,7 @@ import { TemporalJourney } from './TemporalJourney';
 import { DataStreams } from './DataStreams';
 
 export interface ObservatoryViewProps {
-  onNavigate?: (route: RouteId) => void;
+  onNavigate?: (route: RouteId, params?: Record<string, string>) => void;
 }
 
 export const ObservatoryView: React.FC<ObservatoryViewProps> = ({ onNavigate }) => {
@@ -89,6 +89,13 @@ export const ObservatoryView: React.FC<ObservatoryViewProps> = ({ onNavigate }) 
       <DiscoveryPreview
         discoveries={viewModel.topDiscoveries}
         onViewAllDiscoveries={() => onNavigate?.('discover')}
+        onExploreEvidence={(disc) => {
+          const stream = disc.source === 'cross-temporal' ? 'spotify' : disc.source;
+          onNavigate?.('explore', {
+            stream,
+            discoveryId: disc.id,
+          });
+        }}
       />
 
       {/* 5. TEMPORAL JOURNEY (THE YEARS LEAVE A TRACE) */}

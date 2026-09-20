@@ -3,16 +3,18 @@ import { Discovery } from '../../analytics';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { ChevronDown, ChevronUp, FileText, CheckCircle2, TrendingUp, Sparkles, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, CheckCircle2, TrendingUp, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
 
 export interface DiscoveryPreviewProps {
   discoveries: Discovery[];
   onViewAllDiscoveries?: () => void;
+  onExploreEvidence?: (discovery: Discovery) => void;
 }
 
 export const DiscoveryPreview: React.FC<DiscoveryPreviewProps> = ({
   discoveries,
   onViewAllDiscoveries,
+  onExploreEvidence,
 }) => {
   // Set of expanded discovery IDs
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set([discoveries[0]?.id || '']));
@@ -105,7 +107,7 @@ export const DiscoveryPreview: React.FC<DiscoveryPreviewProps> = ({
               </p>
 
               {/* Expand Evidence Trigger Button */}
-              <div className="pt-2 border-t border-border-subtle flex items-center justify-between">
+              <div className="pt-2 border-t border-border-subtle flex items-center justify-between gap-2 flex-wrap">
                 <button
                   onClick={() => toggleExpand(disc.id)}
                   aria-expanded={isExpanded}
@@ -116,9 +118,23 @@ export const DiscoveryPreview: React.FC<DiscoveryPreviewProps> = ({
                   {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
-                <span className="text-[10px] text-content-dim font-mono">
-                  {disc.evidence.length} data point{disc.evidence.length > 1 ? 's' : ''}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-content-dim font-mono">
+                    {disc.evidence.length} data point{disc.evidence.length > 1 ? 's' : ''}
+                  </span>
+
+                  {onExploreEvidence && (
+                    <button
+                      type="button"
+                      onClick={() => onExploreEvidence(disc)}
+                      className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-accent-primary hover:text-sky-300 transition-colors bg-accent-primary-dim px-2 py-0.5 rounded border border-accent-primary/20 hover:border-accent-primary/50"
+                      title="Drill-down to raw receipts verifying this pattern"
+                    >
+                      <span>EXPLORE EVIDENCE</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Expanded Evidentiary Breakdown */}
@@ -179,6 +195,21 @@ export const DiscoveryPreview: React.FC<DiscoveryPreviewProps> = ({
                     <div className="p-2 rounded bg-surface/50 border border-border-subtle text-[10px] text-content-dim flex items-start gap-2">
                       <AlertCircle className="w-3.5 h-3.5 text-accent-secondary shrink-0 mt-0.5" />
                       <span>Strict non-causal temporal comparison across distinct historical receipt streams.</span>
+                    </div>
+                  )}
+
+                  {onExploreEvidence && (
+                    <div className="pt-2 flex justify-end">
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        onClick={() => onExploreEvidence(disc)}
+                        icon={<ArrowRight className="w-3.5 h-3.5" />}
+                        iconPosition="right"
+                        className="font-mono text-xs"
+                      >
+                        Inspect Supporting Receipts in Explorer
+                      </Button>
                     </div>
                   )}
                 </div>

@@ -1,162 +1,358 @@
-import React, { useState } from 'react';
-import { SectionHeader } from '../../components/ui/SectionHeader';
-import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
-import { ShieldCheck, Filter, AlertCircle, Music, Wallet, CreditCard } from 'lucide-react';
-import { DatasetId } from '../../types/common';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { RouteId } from '../../types/common';
+import { useLifeAnalytics } from '../../hooks';
+import {
+  ExplorerFilterState,
+  ExplorerReceipt,
+  HourRange,
+  SortOption,
+  StreamId,
+} from './explorerTypes';
+import {
+  computeExplorerSummary,
+  extractFilterOptions,
+  filterReceipts,
+  householdToReceipt,
+  paginateReceipts,
+  sortReceipts,
+  spotifyToReceipt,
+  transactionToReceipt,
+} from './explorerModel';
+import { ExplorerToolbar } from './ExplorerToolbar';
+import { ExplorerFilters } from './ExplorerFilters';
+import { ExplorerSummary } from './ExplorerSummary';
+import { ExplorerResults } from './ExplorerResults';
+import { ExplorerDetailPanel } from './ExplorerDetailPanel';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { loadSpotifyData } from '../../data/spotify/loader';
+import { loadHouseholdData } from '../../data/household/loader';
+import { loadTransactionData } from '../../data/transactions/loader';
 
-export const ExplorerView: React.FC = () => {
-  const [activeStream, setActiveStream] = useState<DatasetId | 'all'>('all');
+export interface ExplorerViewProps {
+  initialParams?: Record<string, string>;
+  onNavigate?: (route: RouteId, params?: Record<string, string>) => void;
+}
+
+// In-memory cache for transformed receipts so stream switching is near-instant
+const _receiptCache = new Map<StreamId, ExplorerReceipt[]>();
+
+export const ExplorerView: React.FC<ExplorerViewProps> = ({ initialParams, onNavigate }) => {
+  const { analytics } = useLifeAnalytics();
+
+  // 1. Initial State from URL / Deep-link params
+  const initialStream = (initialParams?.stream as StreamId) || 'spotify';
+  const initialYear = initialParams?.year ? Number(initialParams.year) : 'all';
+  const initialHour = (initialParams?.hourRange as HourRange) || 'all';
+  const initialSearch = initialParams?.search || '';
+
+  const [filters, setFilters] = useState<ExplorerFilterState>({
+    stream: initialStream,
+    search: initialSearch,
+    year: initialYear,
+    category: 'all',
+    subcategory: 'all',
+    direction: 'all',
+    mode: 'all',
+    state: 'all',
+    skipped: 'all',
+    hourRange: initialHour,
+    sortBy: 'recent',
+    page: 1,
+    pageSize: 25,
+  });
+
+  const [streamReceipts, setStreamReceipts] = useState<ExplorerReceipt[]>([]);
+  const [loadingStream, setLoadingStream] = useState<boolean>(true);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<ExplorerReceipt | null>(null);
+
+  // Handle Discovery Drill-Down from initialParams
+  useEffect(() => {
+    if (initialParams?.discoveryId && analytics?.discoveries) {
+      const disc = analytics.discoveries.find((d) => d.id === initialParams.discoveryId);
+      if (disc) {
+        let stream: StreamId = filters.stream;
+        if (disc.source === 'spotify') stream = 'spotify';
+        else if (disc.source === 'household') stream = 'household';
+        else if (disc.source === 'transactions') stream = 'transactions';
+
+        let targetYear: number | 'all' = 'all';
+        let targetCategory = 'all';
+        let targetHour: HourRange = 'all';
+        let targetSkipped: 'all' | 'skipped' | 'completed' = 'all';
+        let targetSearch = '';
+        let targetSort: SortOption = 'recent';
+
+        if (disc.id === 'disc-spotify-hour-concentration') {
+          targetHour = 'evening_night';
+        } else if (disc.id === 'disc-spotify-persistent-artist') {
+          targetSearch = 'Beatles';
+        } else if (disc.id === 'disc-spotify-skip-shift') {
+          targetYear = 2015;
+          targetSkipped = 'skipped';
+        } else if (disc.id === 'disc-spotify-peak-eras') {
+          targetYear = 2020;
+        } else if (disc.id === 'disc-household-food-dominance') {
+          targetCategory = 'Food';
+        } else if (disc.id === 'disc-household-freq-vs-impact') {
+          targetSort = 'magnitude';
+        } else if (disc.id === 'disc-txn-category-ticket-size') {
+          targetCategory = 'travel';
+          targetSort = 'magnitude';
+        }
+
+        setFilters((prev) => ({
+          ...prev,
+          stream,
+          year: targetYear,
+          category: targetCategory,
+          hourRange: targetHour,
+          skipped: targetSkipped,
+          search: targetSearch,
+          sortBy: targetSort,
+          page: 1,
+          discoveryDrillDown: {
+            id: disc.id,
+            title: disc.title,
+            summary: disc.subtitle,
+            period: disc.period,
+            filterDescription: `Pre-filtered to records verifying: "${disc.title}"`,
+          },
+        }));
+      }
+    }
+  }, [initialParams?.discoveryId, analytics?.discoveries]);
+
+  // Load Stream Data when activeStream changes
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadDataForStream(stream: StreamId) {
+      // Check cache first
+      if (_receiptCache.has(stream)) {
+        setStreamReceipts(_receiptCache.get(stream)!);
+        setLoadingStream(false);
+        setStreamError(null);
+        return;
+      }
+
+      setLoadingStream(true);
+      setStreamError(null);
+
+      try {
+        let receipts: ExplorerReceipt[] = [];
+
+        if (stream === 'spotify') {
+          const res = await loadSpotifyData();
+          if (isCancelled) return;
+          receipts = res.records.map((r, i) => spotifyToReceipt(r, i));
+        } else if (stream === 'household') {
+          const res = await loadHouseholdData();
+          if (isCancelled) return;
+          receipts = res.records.map((r, i) => householdToReceipt(r, i));
+        } else if (stream === 'transactions') {
+          const res = await loadTransactionData();
+          if (isCancelled) return;
+          receipts = res.records.map((r, i) => transactionToReceipt(r, i));
+        }
+
+        _receiptCache.set(stream, receipts);
+        if (!isCancelled) {
+          setStreamReceipts(receipts);
+          setLoadingStream(false);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setStreamError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to parse telemetry stream receipts.'
+          );
+          setLoadingStream(false);
+        }
+      }
+    }
+
+    loadDataForStream(filters.stream);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [filters.stream]);
+
+  // Filter & Options memoization
+  const filterOptions = useMemo(() => {
+    return extractFilterOptions(streamReceipts);
+  }, [streamReceipts]);
+
+  const filteredReceipts = useMemo(() => {
+    return filterReceipts(streamReceipts, filters);
+  }, [streamReceipts, filters]);
+
+  const sortedReceipts = useMemo(() => {
+    return sortReceipts(filteredReceipts, filters.sortBy);
+  }, [filteredReceipts, filters.sortBy]);
+
+  const pagination = useMemo(() => {
+    return paginateReceipts(sortedReceipts, filters.page, filters.pageSize);
+  }, [sortedReceipts, filters.page, filters.pageSize]);
+
+  const summaryMetrics = useMemo(() => {
+    return computeExplorerSummary(filteredReceipts, filters.stream);
+  }, [filteredReceipts, filters.stream]);
+
+  // Handler: Stream Selection
+  const handleSelectStream = useCallback((stream: StreamId) => {
+    setSelectedReceipt(null);
+    setFilters({
+      stream,
+      search: '',
+      year: 'all',
+      category: 'all',
+      subcategory: 'all',
+      direction: 'all',
+      mode: 'all',
+      state: 'all',
+      skipped: 'all',
+      hourRange: 'all',
+      sortBy: 'recent',
+      page: 1,
+      pageSize: 25,
+      discoveryDrillDown: undefined,
+    });
+  }, []);
+
+  // Handler: Filter Change
+  const handleFilterChange = useCallback((patch: Partial<ExplorerFilterState>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  // Handler: Reset Filters
+  const handleResetFilters = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      search: '',
+      year: 'all',
+      category: 'all',
+      subcategory: 'all',
+      direction: 'all',
+      mode: 'all',
+      state: 'all',
+      skipped: 'all',
+      hourRange: 'all',
+      sortBy: 'recent',
+      page: 1,
+      discoveryDrillDown: undefined,
+    }));
+  }, []);
+
+  // Handler: Clear Discovery Drill-down
+  const handleClearDiscoveryDrillDown = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      discoveryDrillDown: undefined,
+      hourRange: 'all',
+      skipped: 'all',
+      page: 1,
+    }));
+  }, []);
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      <SectionHeader
-        tag="DATA INSPECTOR // MULTI-MODAL STREAM"
-        title="Sanitized Receipt Explorer"
-        description="Inspect granular receipts across all 3 streams with strict real-time PII sanitization. Credit card numbers, customer names, addresses, and customer IDs are omitted at the data adapter boundary."
-        level="h1"
-        action={
-          <div className="flex items-center gap-2">
-            <Badge variant="success" size="md" icon={<ShieldCheck className="w-3.5 h-3.5" />}>
-              Strict PII Scrubbing Active
-            </Badge>
-          </div>
-        }
+    <div className="space-y-6 animate-fadeIn pb-16">
+      {/* 1. Explorer Header & Toolbar */}
+      <ExplorerToolbar
+        activeStream={filters.stream}
+        onSelectStream={handleSelectStream}
+        searchQuery={filters.search}
+        onSearchChange={(q) => handleFilterChange({ search: q, page: 1 })}
+        analytics={analytics}
+        totalMatching={filteredReceipts.length}
       />
 
-      {/* Stream Filter Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-lg bg-surface border border-border/80">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-content-dim ml-1" />
-          <span className="text-xs font-mono uppercase text-content-dim">Filter Stream:</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setActiveStream('all')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-colors ${activeStream === 'all'
-                  ? 'bg-accent-primary text-background font-semibold'
-                  : 'text-content-muted hover:text-content-main hover:bg-surface-elevated'
-                }`}
-            >
-              All Streams
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveStream('spotify')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 ${activeStream === 'spotify'
-                  ? 'bg-accent-emerald text-background font-semibold'
-                  : 'text-content-muted hover:text-content-main hover:bg-surface-elevated'
-                }`}
-            >
-              <Music className="w-3 h-3" />
-              Spotify (2013–24)
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveStream('household')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 ${activeStream === 'household'
-                  ? 'bg-accent-primary text-background font-semibold'
-                  : 'text-content-muted hover:text-content-main hover:bg-surface-elevated'
-                }`}
-            >
-              <Wallet className="w-3 h-3" />
-              Household (2015–18)
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveStream('transactions')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 ${activeStream === 'transactions'
-                  ? 'bg-accent-secondary text-background font-semibold'
-                  : 'text-content-muted hover:text-content-main hover:bg-surface-elevated'
-                }`}
-            >
-              <CreditCard className="w-3 h-3" />
-              Transact (2022–24)
-            </button>
-          </div>
+      {/* 2. Error State */}
+      {streamError && (
+        <div className="py-12 flex justify-center">
+          <ErrorState
+            title="EXPLORER DATA UNAVAILABLE"
+            message={streamError}
+            onRetry={() => {
+              _receiptCache.delete(filters.stream);
+              setFilters((prev) => ({ ...prev }));
+            }}
+            className="w-full max-w-md"
+          />
         </div>
+      )}
 
-        <div className="text-xs font-mono text-content-dim">
-          Showing Sanitized Schema Samples
-        </div>
-      </div>
+      {/* 3. Main Explorer Workspace (when no error) */}
+      {!streamError && (
+        <>
+          {/* Adaptive Filters */}
+          <ExplorerFilters
+            filters={filters}
+            filterOptions={filterOptions}
+            onFilterChange={handleFilterChange}
+            onResetFilters={handleResetFilters}
+            onClearDiscoveryDrillDown={handleClearDiscoveryDrillDown}
+            onBackToDiscovery={() => onNavigate?.('observatory')}
+          />
 
-      {/* Schema Protection Guarantee Card */}
-      <Card variant="subtle" padding="sm" className="border-accent-emerald/30 bg-accent-emerald-dim/20">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-accent-emerald shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold font-mono uppercase text-accent-emerald tracking-wide">
-              PII Redaction Pipeline Policy
-            </h4>
-            <p className="text-xs text-content-muted leading-relaxed">
-              Every India Transaction record undergoes strict client-side sanitization before entering application memory:
-              <strong className="text-content-main"> cc_num, first, last, street, dob, and customer_id</strong> are permanently scrubbed.
-              Only safe analytical fields (amount, merchant name, category, state, city) are accessible to the UI.
-            </p>
-          </div>
-        </div>
-      </Card>
+          {/* Explorer Summary & Sorting Bar */}
+          <ExplorerSummary
+            summary={summaryMetrics}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            sortBy={filters.sortBy}
+            onSortChange={(sortBy) => handleFilterChange({ sortBy, page: 1 })}
+            stream={filters.stream}
+          />
 
-      {/* Exemplar Schema Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card variant="default">
-          <div className="flex items-center justify-between mb-3">
-            <Badge variant="success" size="sm">Auditory Receipt</Badge>
-            <span className="font-mono text-xs text-content-dim">Spotify Stream</span>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="font-semibold text-content-main text-sm">Drinking from the Bottle</div>
-            <div className="text-content-muted">Artist: Calvin Harris ft. Tinie Tempah</div>
-            <div className="text-content-muted">Album: 18 Months</div>
-            <div className="pt-2 border-t border-border-subtle flex justify-between font-mono text-[11px] text-content-dim">
-              <span>Timestamp: 2013-07-08</span>
-              <span>Played: 61.8s</span>
+          {/* Results Grid / Detail Workspace */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left/Center Results List Feed */}
+            <div className={selectedReceipt ? 'lg:col-span-7 xl:col-span-8' : 'lg:col-span-12'}>
+              <ExplorerResults
+                receipts={pagination.items}
+                isLoading={loadingStream}
+                selectedReceipt={selectedReceipt}
+                onSelectReceipt={(receipt) => {
+                  setSelectedReceipt((prev) => (prev?.id === receipt.id ? null : receipt));
+                }}
+                page={pagination.page}
+                pageSize={filters.pageSize}
+                totalPages={pagination.totalPages}
+                totalRecords={pagination.total}
+                onPageChange={(p) => handleFilterChange({ page: p })}
+                onPageSizeChange={(sz) => handleFilterChange({ pageSize: sz, page: 1 })}
+                onClearFilters={handleResetFilters}
+                hasQuery={!!filters.search.trim() || filters.year !== 'all' || filters.category !== 'all'}
+              />
             </div>
-          </div>
-        </Card>
 
-        <Card variant="default">
-          <div className="flex items-center justify-between mb-3">
-            <Badge variant="primary" size="sm">Domestic Ledger</Badge>
-            <span className="font-mono text-xs text-content-dim">Household CSV</span>
+            {/* Right Detail Panel on Desktop */}
+            {selectedReceipt && (
+              <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
+                <ExplorerDetailPanel
+                  receipt={selectedReceipt}
+                  onClose={() => setSelectedReceipt(null)}
+                />
+              </div>
+            )}
           </div>
-          <div className="space-y-2 text-xs">
-            <div className="font-semibold text-content-main text-sm">Netflix Subscription (1 mo)</div>
-            <div className="text-content-muted">Category: Subscription</div>
-            <div className="text-content-muted">Mode: Saving Bank Account 1</div>
-            <div className="pt-2 border-t border-border-subtle flex justify-between font-mono text-[11px] text-content-dim">
-              <span>Date: 19/09/2018</span>
-              <span className="text-content-main font-bold">₹199.00</span>
-            </div>
-          </div>
-        </Card>
 
-        <Card variant="default">
-          <div className="flex items-center justify-between mb-3">
-            <Badge variant="secondary" size="sm">Sanitized POS</Badge>
-            <span className="font-mono text-xs text-content-dim">Card Transact</span>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="font-semibold text-content-main text-sm">Bedi-Krish Pvt Ltd</div>
-            <div className="text-content-muted">Category: Entertainment</div>
-            <div className="text-content-muted">Region: Rajasthan, India</div>
-            <div className="pt-2 border-t border-border-subtle flex justify-between font-mono text-[11px] text-content-dim">
-              <span>Date: 12/26/2023</span>
-              <span className="text-content-main font-bold">₹8,552.65</span>
+          {/* Mobile Detail Modal / Drawer */}
+          {selectedReceipt && (
+            <div className="lg:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center animate-fadeIn">
+              <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <ExplorerDetailPanel
+                  receipt={selectedReceipt}
+                  onClose={() => setSelectedReceipt(null)}
+                />
+              </div>
             </div>
-            <div className="text-[10px] font-mono text-accent-emerald pt-1">
-              ✓ Card number & personal name scrubbed
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Phase 2 Implementation Notice */}
-      <div className="p-4 rounded-lg bg-surface/40 border border-dashed border-border text-center text-xs text-content-muted font-mono">
-        <AlertCircle className="w-4 h-4 text-accent-primary mx-auto mb-2" />
-        Granular paginated table explorer & search indexing will activate in Phase 2 upon preprocessed data ingestion.
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
