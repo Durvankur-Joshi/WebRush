@@ -7,12 +7,13 @@ import { StoryView } from '../../features/story/StoryView';
 
 export interface RouterProps {
   currentRoute: RouteId;
+  onRouteChange?: (route: RouteId) => void;
 }
 
-export const AppRouter: React.FC<RouterProps> = ({ currentRoute }) => {
+export const AppRouter: React.FC<RouterProps> = ({ currentRoute, onRouteChange }) => {
   switch (currentRoute) {
     case 'observatory':
-      return <ObservatoryView />;
+      return <ObservatoryView onNavigate={onRouteChange} />;
     case 'explore':
       return <ExplorerView />;
     case 'discover':
@@ -20,6 +21,6 @@ export const AppRouter: React.FC<RouterProps> = ({ currentRoute }) => {
     case 'story':
       return <StoryView />;
     default:
-      return <ObservatoryView />;
+      return <ObservatoryView onNavigate={onRouteChange} />;
   }
 };

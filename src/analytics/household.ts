@@ -1,173 +1,235 @@
-import { CategoryAggregate, HouseholdAnalytics, HouseholdRawRecord, SubcategorySummary, YearlyFinanceMetric } from '../types/household';
-import { WeekdayDistribution } from '../types/common';
-import { parseCustomDate } from '../lib/formatters';
+import { HouseholdNormalizedRecord } from '../data/household/types';
+import {
+  groupByYear,
+  groupByMonth,
+  groupByWeekday,
+  YearBucket,
+  MonthBucket,
+  WeekdayBucket,
+} from './temporal';
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export interface HouseholdCategoryBucket {
+  category: string;
+  count: number;
+  amount: number;
+  percentage: number;
+}
 
-/**
- * Transforms raw Household transactions into structured financial analytics.
- */
-export function computeHouseholdAnalytics(records: HouseholdRawRecord[]): HouseholdAnalytics {
-  if (!records || records.length === 0) {
-    return createEmptyHouseholdAnalytics();
-  }
+export interface HouseholdSubcategoryBucket {
+  subcategory: string;
+  category: string;
+  count: number;
+  amount: number;
+}
+
+export interface HouseholdYearlyRecord {
+  year: number;
+  expenses: number;
+  income: number;
+  net: number;
+  count: number;
+}
+
+export interface HouseholdLargeTransaction {
+  date: string;
+  category: string;
+  subcategory: string;
+  amount: number;
+  direction: string;
+}
+
+export interface HouseholdAnalytics {
+  totalRecords: number;
+  dateRange: { start: string; end: string };
+  expenseCount: number;
+  incomeCount: number;
+  totalExpenses: number;
+  totalIncome: number;
+  netAmount: number;
+  categoryFrequency: HouseholdCategoryBucket[];
+  categoryAmounts: HouseholdCategoryBucket[];
+  categoryPercentages: HouseholdCategoryBucket[];
+  subcategoryFrequency: HouseholdSubcategoryBucket[];
+  subcategoryAmounts: HouseholdSubcategoryBucket[];
+  yearlyAmounts: HouseholdYearlyRecord[];
+  yearlyCounts: YearBucket[];
+  monthlyAmounts: MonthBucket[];
+  weekdayAmounts: WeekdayBucket[];
+  topSubcategories: HouseholdSubcategoryBucket[];
+  largestTransactions: HouseholdLargeTransaction[];
+  modeDistribution: { mode: string; count: number; percentage: number }[];
+  currencyDistribution: { currency: string; count: number }[];
+  incomeVsExpense: { label: string; value: number }[];
+}
+
+export function computeHouseholdAnalytics(records: HouseholdNormalizedRecord[]): HouseholdAnalytics {
+  if (!records || records.length === 0) return createEmptyHouseholdAnalytics();
 
   let minDate = '';
   let maxDate = '';
+  let totalExpenses = 0;
+  let totalIncome = 0;
   let expenseCount = 0;
   let incomeCount = 0;
-  let totalExpenseAmount = 0;
-  let totalIncomeAmount = 0;
 
-  const catMap = new Map<string, { count: number; amount: number }>();
-  const subcatMap = new Map<string, { category: string; count: number; amount: number }>();
-  const yearlyMap = new Map<number, { expense: number; income: number; count: number }>();
-  const weekdayCount = new Array(7).fill(0);
-  const weekdayAmount = new Array(7).fill(0);
+  const catMap = new Map<string, { count: number; expense: number }>();
+  const subcatMap = new Map<string, { category: string; count: number; expense: number }>();
+  const yearlyMap = new Map<number, { expenses: number; income: number; count: number }>();
+  const modeMap = new Map<string, number>();
+  const currencyMap = new Map<string, number>();
+  const largestTxns: HouseholdLargeTransaction[] = [];
 
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    if (!r) continue;
+  for (const r of records) {
+    if (!minDate || r.date < minDate) minDate = r.date;
+    if (!maxDate || r.date > maxDate) maxDate = r.date;
 
-    const amt = Number(r.Amount) || 0;
-    const isExpense = r['Income/Expense']?.toLowerCase() === 'expense';
-    const isIncome = r['Income/Expense']?.toLowerCase() === 'income';
+    const isExpense = r.direction === 'expense';
+    const isIncome = r.direction === 'income';
 
-    if (isExpense) {
-      expenseCount++;
-      totalExpenseAmount += amt;
-    } else if (isIncome) {
-      incomeCount++;
-      totalIncomeAmount += amt;
-    }
+    if (isExpense) { totalExpenses += r.amount; expenseCount++; }
+    if (isIncome) { totalIncome += r.amount; incomeCount++; }
 
-    // Category aggregation
-    const category = (r.Category || 'Uncategorized').trim();
-    let cData = catMap.get(category);
-    if (!cData) {
-      cData = { count: 0, amount: 0 };
-      catMap.set(category, cData);
-    }
-    cData.count += 1;
-    if (isExpense) cData.amount += amt;
+    // Category
+    let cData = catMap.get(r.category);
+    if (!cData) { cData = { count: 0, expense: 0 }; catMap.set(r.category, cData); }
+    cData.count++;
+    if (isExpense) cData.expense += r.amount;
 
-    // Subcategory aggregation
-    const subcat = (r.Subcategory || 'General').trim();
-    const subKey = `${category}::${subcat}`;
+    // Subcategory
+    const subKey = `${r.category}:::${r.subcategory}`;
     let sData = subcatMap.get(subKey);
-    if (!sData) {
-      sData = { category, count: 0, amount: 0 };
-      subcatMap.set(subKey, sData);
-    }
-    sData.count += 1;
-    if (isExpense) sData.amount += amt;
+    if (!sData) { sData = { category: r.category, count: 0, expense: 0 }; subcatMap.set(subKey, sData); }
+    sData.count++;
+    if (isExpense) sData.expense += r.amount;
 
-    // Date aggregation
-    if (r.Date) {
-      const dt = parseCustomDate(r.Date);
-      if (!isNaN(dt.getTime())) {
-        const yr = dt.getFullYear();
-        const wd = dt.getDay();
-        const iso = dt.toISOString().slice(0, 10);
+    // Yearly
+    let yData = yearlyMap.get(r.year);
+    if (!yData) { yData = { expenses: 0, income: 0, count: 0 }; yearlyMap.set(r.year, yData); }
+    yData.count++;
+    if (isExpense) yData.expenses += r.amount;
+    if (isIncome) yData.income += r.amount;
 
-        if (!minDate || iso < minDate) minDate = iso;
-        if (!maxDate || iso > maxDate) maxDate = iso;
+    // Mode
+    modeMap.set(r.mode, (modeMap.get(r.mode) ?? 0) + 1);
 
-        weekdayCount[wd] = (weekdayCount[wd] || 0) + 1;
-        if (isExpense) weekdayAmount[wd] = (weekdayAmount[wd] || 0) + amt;
+    // Currency
+    currencyMap.set(r.currency, (currencyMap.get(r.currency) ?? 0) + 1);
 
-        let yData = yearlyMap.get(yr);
-        if (!yData) {
-          yData = { expense: 0, income: 0, count: 0 };
-          yearlyMap.set(yr, yData);
-        }
-        yData.count += 1;
-        if (isExpense) yData.expense += amt;
-        if (isIncome) yData.income += amt;
-      }
+    // Collect for largest transactions (top 20 by amount)
+    if (isExpense && r.amount > 0) {
+      largestTxns.push({ date: r.date, category: r.category, subcategory: r.subcategory, amount: r.amount, direction: r.direction });
     }
   }
 
+  const totalRecords = records.length;
+
   // Category aggregates
-  const categoryFrequency: CategoryAggregate[] = Array.from(catMap.entries())
-    .map(([category, data]) => ({
+  const categoryFrequency: HouseholdCategoryBucket[] = Array.from(catMap.entries())
+    .map(([category, d]) => ({
       category,
-      count: data.count,
-      amount: Math.round(data.amount),
-      percentage: Number(((data.count / Math.max(1, records.length)) * 100).toFixed(1)),
+      count: d.count,
+      amount: Math.round(d.expense),
+      percentage: Number((d.count / totalRecords * 100).toFixed(2)),
     }))
     .sort((a, b) => b.count - a.count);
 
-  const categoryAmounts: CategoryAggregate[] = Array.from(catMap.entries())
-    .map(([category, data]) => ({
+  const categoryAmounts: HouseholdCategoryBucket[] = Array.from(catMap.entries())
+    .map(([category, d]) => ({
       category,
-      count: data.count,
-      amount: Math.round(data.amount),
-      percentage: Number(((data.amount / Math.max(1, totalExpenseAmount)) * 100).toFixed(1)),
+      count: d.count,
+      amount: Math.round(d.expense),
+      percentage: totalExpenses > 0 ? Number((d.expense / totalExpenses * 100).toFixed(2)) : 0,
     }))
     .sort((a, b) => b.amount - a.amount);
 
-  // Top subcategories
-  const topSubcategories: SubcategorySummary[] = Array.from(subcatMap.entries())
-    .map(([key, data]) => {
-      const subcat = key.split('::')[1] || key;
-      return {
-        subcategory: subcat,
-        category: data.category,
-        amount: Math.round(data.amount),
-        count: data.count,
-      };
-    })
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 15);
+  const categoryPercentages = [...categoryAmounts];
 
-  // Yearly aggregates
-  const yearlyAmounts: YearlyFinanceMetric[] = Array.from(yearlyMap.entries())
-    .map(([year, data]) => ({
+  // Subcategory aggregates
+  const subcategoryFrequency: HouseholdSubcategoryBucket[] = Array.from(subcatMap.entries())
+    .map(([key, d]) => {
+      const subcategory = key.split(':::')[1] ?? key;
+      return { subcategory, category: d.category, count: d.count, amount: Math.round(d.expense) };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  const subcategoryAmounts: HouseholdSubcategoryBucket[] = [...subcategoryFrequency]
+    .sort((a, b) => b.amount - a.amount);
+
+  // Yearly
+  const yearlyAmounts: HouseholdYearlyRecord[] = Array.from(yearlyMap.entries())
+    .map(([year, d]) => ({
       year,
-      expense: Math.round(data.expense),
-      income: Math.round(data.income),
-      count: data.count,
+      expenses: Math.round(d.expenses),
+      income: Math.round(d.income),
+      net: Math.round(d.income - d.expenses),
+      count: d.count,
     }))
     .sort((a, b) => a.year - b.year);
 
-  // Weekday distribution
-  const weekdayPatterns: WeekdayDistribution[] = weekdayCount.map((count, day) => ({
-    day,
-    dayName: WEEKDAYS[day] || `Day ${day}`,
-    count,
-    value: Math.round(weekdayAmount[day] || 0),
-  }));
+  // Mode distribution
+  const modeTotal = records.length;
+  const modeDistribution = Array.from(modeMap.entries())
+    .map(([mode, count]) => ({ mode, count, percentage: Number((count / modeTotal * 100).toFixed(2)) }))
+    .sort((a, b) => b.count - a.count);
+
+  // Currency distribution
+  const currencyDistribution = Array.from(currencyMap.entries())
+    .map(([currency, count]) => ({ currency, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Largest transactions (top 20)
+  largestTxns.sort((a, b) => b.amount - a.amount);
 
   return {
-    totalRecords: records.length,
-    dateRange: { start: minDate || '2015-01-01', end: maxDate || '2018-12-31' },
+    totalRecords,
+    dateRange: { start: minDate, end: maxDate },
     expenseCount,
     incomeCount,
-    totalExpenseAmount: Math.round(totalExpenseAmount),
-    totalIncomeAmount: Math.round(totalIncomeAmount),
+    totalExpenses: Math.round(totalExpenses),
+    totalIncome: Math.round(totalIncome),
+    netAmount: Math.round(totalIncome - totalExpenses),
     categoryFrequency,
     categoryAmounts,
+    categoryPercentages,
+    subcategoryFrequency,
+    subcategoryAmounts,
     yearlyAmounts,
-    yearlyCounts: yearlyAmounts.map((y) => ({ year: y.year, count: y.count })),
-    topSubcategories,
-    weekdayPatterns,
+    yearlyCounts: groupByYear(records, (r) => r.year, () => 1),
+    monthlyAmounts: groupByMonth(records, (r) => r.year, (r) => r.month, (r) => r.amount),
+    weekdayAmounts: groupByWeekday(records, (r) => r.weekday, (r) => r.amount),
+    topSubcategories: subcategoryAmounts.slice(0, 20),
+    largestTransactions: largestTxns.slice(0, 20),
+    modeDistribution,
+    currencyDistribution,
+    incomeVsExpense: [
+      { label: 'Total Expenses', value: Math.round(totalExpenses) },
+      { label: 'Total Income', value: Math.round(totalIncome) },
+    ],
   };
 }
 
 export function createEmptyHouseholdAnalytics(): HouseholdAnalytics {
   return {
     totalRecords: 0,
-    dateRange: { start: '2015-01-01', end: '2018-12-31' },
+    dateRange: { start: '', end: '' },
     expenseCount: 0,
     incomeCount: 0,
-    totalExpenseAmount: 0,
-    totalIncomeAmount: 0,
+    totalExpenses: 0,
+    totalIncome: 0,
+    netAmount: 0,
     categoryFrequency: [],
     categoryAmounts: [],
+    categoryPercentages: [],
+    subcategoryFrequency: [],
+    subcategoryAmounts: [],
     yearlyAmounts: [],
     yearlyCounts: [],
+    monthlyAmounts: [],
+    weekdayAmounts: [],
     topSubcategories: [],
-    weekdayPatterns: WEEKDAYS.map((name, i) => ({ day: i, dayName: name, count: 0 })),
+    largestTransactions: [],
+    modeDistribution: [],
+    currencyDistribution: [],
+    incomeVsExpense: [],
   };
 }

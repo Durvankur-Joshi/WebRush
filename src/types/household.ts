@@ -1,4 +1,5 @@
-import { DateRange, WeekdayDistribution } from './common';
+export type { DateRange, WeekdayDistribution } from './common';
+export type { HouseholdAnalytics, HouseholdCategoryBucket, HouseholdSubcategoryBucket, HouseholdYearlyRecord, HouseholdLargeTransaction } from '../analytics/household';
 
 export interface HouseholdRawRecord {
   Date: string;
@@ -30,19 +31,4 @@ export interface YearlyFinanceMetric {
   expense: number;
   income: number;
   count: number;
-}
-
-export interface HouseholdAnalytics {
-  totalRecords: number;
-  dateRange: DateRange;
-  expenseCount: number;
-  incomeCount: number;
-  totalExpenseAmount: number;
-  totalIncomeAmount: number;
-  categoryFrequency: CategoryAggregate[];
-  categoryAmounts: CategoryAggregate[];
-  yearlyAmounts: YearlyFinanceMetric[];
-  yearlyCounts: { year: number; count: number }[];
-  topSubcategories: SubcategorySummary[];
-  weekdayPatterns: WeekdayDistribution[];
 }

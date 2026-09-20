@@ -1,4 +1,5 @@
-import { DateRange, HourlyDistribution, WeekdayDistribution } from './common';
+export type { DateRange, HourlyDistribution, WeekdayDistribution } from './common';
+export type { TransactionAnalytics, TransactionCategoryBucket, TransactionLocationBucket, TransactionAmountBucket } from '../analytics/transactions';
 
 /**
  * Raw record interface matching CSV/JSON headers.
@@ -57,19 +58,4 @@ export interface TransactionCategoryMetric {
   amount: number;
   count: number;
   percentage: number;
-}
-
-export interface TransactionAnalytics {
-  totalRecords: number;
-  dateRange: DateRange;
-  totalAmount: number;
-  fraudCount: number;
-  fraudRate: number;
-  categoryFrequency: TransactionCategoryMetric[];
-  categoryAmounts: TransactionCategoryMetric[];
-  yearlyCounts: { year: number; count: number }[];
-  yearlyAmounts: { year: number; amount: number }[];
-  hourlyPatterns: HourlyDistribution[];
-  weekdayPatterns: WeekdayDistribution[];
-  safeLocationAggregates: LocationAggregate[];
 }

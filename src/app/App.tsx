@@ -10,7 +10,7 @@ export const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <Shell currentRoute={currentRoute} onRouteChange={navigate}>
-        <AppRouter currentRoute={currentRoute} />
+        <AppRouter currentRoute={currentRoute} onRouteChange={navigate} />
       </Shell>
     </ErrorBoundary>
   );

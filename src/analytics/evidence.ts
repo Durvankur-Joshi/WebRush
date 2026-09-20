@@ -1,44 +1,76 @@
-import { DatasetId } from '../types/common';
-import { EvidenceItem, Insight } from '../types/insights';
+export type EvidenceSource = 'spotify' | 'household' | 'transactions' | 'cross-temporal';
 
-/**
- * Constructs a verifiable evidence item attached to an insight.
- * Every claim made in the observatory must cite its ground-truth metric and sample size.
- */
+export interface EvidenceComparison {
+  period: string;
+  value: number;
+  unit: string;
+}
+
+export interface EvidenceItem {
+  metric: string;
+  period: string;
+  value: number;
+  unit: string;
+  comparison?: EvidenceComparison;
+  sampleSize?: number;
+  notes?: string;
+
+  // Compatibility fields for cross-referencing / legacy Insight contracts
+  id?: string;
+  dataset?: string;
+  observedValue?: string | number;
+  timeframe?: string;
+  confidenceScore?: number;
+}
+
+export interface EvidenceBundle {
+  source: EvidenceSource;
+  items: EvidenceItem[];
+}
+
+export function makeEvidence(
+  metric: string,
+  period: string,
+  value: number,
+  unit: string,
+  opts: { comparison?: EvidenceComparison; sampleSize?: number; notes?: string } = {}
+): EvidenceItem {
+  return {
+    metric,
+    period,
+    value: typeof value === 'number' ? Number(value.toFixed(2)) : value,
+    unit,
+    observedValue: `${typeof value === 'number' ? Number(value.toFixed(2)) : value} ${unit}`,
+    timeframe: period,
+    ...opts,
+  };
+}
+
 export function buildEvidence(
-  dataset: DatasetId,
+  dataset: string,
   metric: string,
   observedValue: string | number,
   timeframe: string,
-  sampleSize: number,
-  confidenceScore = 1.0,
-  baselineValue?: string | number,
+  sampleSize?: number,
+  confidenceScore?: number,
   notes?: string
 ): EvidenceItem {
+  const numVal = typeof observedValue === 'number' ? observedValue : parseFloat(String(observedValue)) || 0;
   return {
-    id: `ev-${dataset}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `ev-${Math.random().toString(36).slice(2, 8)}`,
     dataset,
     metric,
-    observedValue,
-    baselineValue,
+    period: timeframe,
     timeframe,
+    value: numVal,
+    unit: String(observedValue).replace(/^[0-9.,\s]+/, '').trim() || 'count',
+    observedValue,
     sampleSize,
-    confidenceScore: Math.min(1, Math.max(0, confidenceScore)),
+    confidenceScore: confidenceScore ?? 0.9,
     notes,
   };
 }
 
-/**
- * Verifies that an insight contains sufficient evidence backing its claims.
- */
-export function verifyInsightEvidence(insight: Insight): { isValid: boolean; reason?: string } {
-  if (!insight.evidence || insight.evidence.length === 0) {
-    return { isValid: false, reason: 'No evidentiary proof attached to insight.' };
-  }
-  for (const ev of insight.evidence) {
-    if (!ev.dataset || ev.sampleSize <= 0) {
-      return { isValid: false, reason: `Invalid evidence item: ${ev.id} lacks sample size or dataset citation.` };
-    }
-  }
-  return { isValid: true };
+export function makeBundle(source: EvidenceSource, items: EvidenceItem[]): EvidenceBundle {
+  return { source, items };
 }

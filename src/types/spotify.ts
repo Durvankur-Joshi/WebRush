@@ -1,4 +1,5 @@
-import { DateRange, HourlyDistribution, WeekdayDistribution } from './common';
+export type { DateRange, HourlyDistribution, WeekdayDistribution } from './common';
+export type { SpotifyAnalytics, SpotifyTopArtist, SpotifyTopTrack, SpotifyTopAlbum, SpotifyYearlyRecord, SpotifyPlatformBucket, SpotifyArtistYearData, SpotifyHeatmapCell } from '../analytics/spotify';
 
 export interface SpotifyRawRecord {
   spotify_track_uri: string;
@@ -46,20 +47,4 @@ export interface ArtistEvolution {
   firstPlayed: string;
   peakYear: number;
   totalHours: number;
-}
-
-export interface SpotifyAnalytics {
-  totalRecords: number;
-  dateRange: DateRange;
-  totalListeningHours: number;
-  uniqueArtists: number;
-  uniqueTracks: number;
-  yearlyListening: YearlyListeningMetric[];
-  monthlyListening: MonthlyListeningMetric[];
-  hourlyListening: HourlyDistribution[];
-  weekdayListening: WeekdayDistribution[];
-  topArtists: TopArtist[];
-  topTracks: TopTrack[];
-  yearlySkipRates: { year: number; skipRate: number }[];
-  artistEvolution: ArtistEvolution[];
 }

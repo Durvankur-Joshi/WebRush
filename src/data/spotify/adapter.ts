@@ -1,12 +1,14 @@
-import { SpotifyAnalytics, SpotifyRawRecord } from '../../types/spotify';
+import { SpotifyAnalytics } from '../../types/spotify';
 import { DatasetMeta } from '../../types/common';
 import { DATASET_METADATA } from '../../lib/constants';
 import { computeSpotifyAnalytics, createEmptySpotifyAnalytics } from '../../analytics/spotify';
+import { SpotifyNormalizedRecord } from './types';
+import { loadSpotifyData } from './loader';
 
 export interface SpotifyAdapter {
   getMetadata(): DatasetMeta;
   loadAnalytics(): Promise<SpotifyAnalytics>;
-  processRawRecords(records: SpotifyRawRecord[]): SpotifyAnalytics;
+  processRecords(records: SpotifyNormalizedRecord[]): SpotifyAnalytics;
 }
 
 export class DefaultSpotifyAdapter implements SpotifyAdapter {
@@ -16,7 +18,7 @@ export class DefaultSpotifyAdapter implements SpotifyAdapter {
     return DATASET_METADATA['spotify'] as DatasetMeta;
   }
 
-  processRawRecords(records: SpotifyRawRecord[]): SpotifyAnalytics {
+  processRecords(records: SpotifyNormalizedRecord[]): SpotifyAnalytics {
     this.cachedAnalytics = computeSpotifyAnalytics(records);
     return this.cachedAnalytics;
   }
@@ -25,8 +27,13 @@ export class DefaultSpotifyAdapter implements SpotifyAdapter {
     if (this.cachedAnalytics) {
       return this.cachedAnalytics;
     }
-    // Returns default empty structure until preprocessed/loaded
-    return createEmptySpotifyAnalytics();
+    try {
+      const { records } = await loadSpotifyData();
+      this.cachedAnalytics = computeSpotifyAnalytics(records);
+      return this.cachedAnalytics;
+    } catch {
+      return createEmptySpotifyAnalytics();
+    }
   }
 }
 
